@@ -112,7 +112,17 @@ async def generate_markdown_summary(
             contents=prompt,
         )
 
-        return response.text
+        text = response.text
+
+        # Strip markdown code fences if present
+        if text.startswith("```markdown"):
+            text = text[len("```markdown"):].strip()
+        if text.startswith("```"):
+            text = text[3:].strip()
+        if text.endswith("```"):
+            text = text[:-3].strip()
+
+        return text
 
     except ImportError:
         console.print("[yellow]google-genai not installed - skipping AI summary[/yellow]")

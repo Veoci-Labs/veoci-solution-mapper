@@ -8,6 +8,7 @@ from veoci_mapper.output.markdown import (
 )
 from veoci_mapper.output.visual import export_html
 from veoci_mapper.output.mermaid import export_mermaid
+from veoci_mapper.output.dashboard import export_dashboard, open_in_browser
 
 __all__ = [
     "export_json",
@@ -17,4 +18,6 @@ __all__ = [
     "generate_basic_markdown",
     "export_html",
     "export_mermaid",
+    "export_dashboard",
+    "open_in_browser",
 ]

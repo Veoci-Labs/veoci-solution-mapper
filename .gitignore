@@ -38,3 +38,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Output directories
+output/
+test-output/

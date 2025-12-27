@@ -12,6 +12,7 @@ dependencies = [
     "questionary>=2.0.0",
     "python-dotenv>=1.0.0",
     "google-genai>=1.56.0",
+    "markdown>=3.10",
 ]
 
 [project.scripts]
@@ -37,6 +38,9 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"src/veoci_mapper/output/dashboard.py" = ["E501"]  # HTML templates have long lines
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
