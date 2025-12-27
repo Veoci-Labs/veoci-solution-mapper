@@ -23,11 +23,12 @@ def build_graph(
     # Add form nodes
     for form in forms:
         form_id = str(form.get("id") or form.get("formId"))
+        is_external = form.get("external", False)
         graph.add_node(
             form_id,
             name=form.get("name", "Unknown"),
             node_type="form",
-            # Add any other useful metadata
+            external=is_external,
         )
 
     # Add workflow nodes

@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 
-from veoci_mapper.analyzer import analyze_solution
+from veoci_mapper.analyzer import analyze_solution, get_referenced_ids
 from veoci_mapper.client import AuthenticationError, VeociClient
-from veoci_mapper.fetcher import fetch_solution
+from veoci_mapper.fetcher import fetch_external_forms, fetch_solution
 from veoci_mapper.graph import build_graph, get_graph_stats
 from veoci_mapper.output import (
     export_dashboard,
@@ -54,10 +54,18 @@ async def run_map(
             relationships = analyze_solution(solution["form_definitions"])
             console.print(f"[green]Found {len(relationships)} relationships[/green]")
 
+            # Fetch external forms
+            existing_form_ids = {str(f.get("id") or f.get("formId")) for f in solution["forms"]}
+            referenced_ids = get_referenced_ids(relationships)
+            external_forms = await fetch_external_forms(client, referenced_ids, existing_form_ids)
+
+            # Merge external forms
+            all_forms = solution["forms"] + external_forms
+
             # Build graph
             console.print("[dim]Building graph...[/dim]")
             graph = build_graph(
-                solution["forms"],
+                all_forms,
                 solution["workflows"],
                 relationships,
             )
@@ -80,7 +88,7 @@ async def run_map(
             # Generate markdown first (needed for dashboard)
             summary = await generate_markdown_summary(
                 container_id=room_id,
-                forms=solution["forms"],
+                forms=all_forms,
                 workflows=solution["workflows"],
                 stats=stats,
                 graph=graph,
@@ -88,7 +96,7 @@ async def run_map(
             if summary is None:
                 summary = generate_basic_markdown(
                     container_id=room_id,
-                    forms=solution["forms"],
+                    forms=all_forms,
                     workflows=solution["workflows"],
                     stats=stats,
                 )
@@ -96,7 +104,7 @@ async def run_map(
             # Dashboard (replaces separate HTML)
             dashboard_path = export_dashboard(
                 container_id=room_id,
-                forms=solution["forms"],
+                forms=all_forms,
                 workflows=solution["workflows"],
                 relationships=relationships,
                 stats=stats,
@@ -109,7 +117,7 @@ async def run_map(
             # JSON
             json_path = export_json(
                 container_id=room_id,
-                forms=solution["forms"],
+                forms=all_forms,
                 workflows=solution["workflows"],
                 relationships=relationships,
                 stats=stats,

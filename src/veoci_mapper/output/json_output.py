@@ -40,6 +40,7 @@ def export_json(
         forms=[{
             "id": str(f.get("id") or f.get("formId")),
             "name": f.get("name", "Unknown"),
+            "external": f.get("external", False),
         } for f in forms],
         workflows=[{
             "id": str(w.get("id") or w.get("processId")),

@@ -52,6 +52,45 @@ async def fetch_all_form_definitions(
     return await asyncio.gather(*tasks)
 
 
+async def fetch_external_forms(
+    client: VeociClient,
+    form_ids: set[str],
+    existing_form_ids: set[str],
+    max_concurrent: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Fetch forms that are referenced but not in the main container.
+
+    Returns forms with an 'external' flag set to True.
+    """
+    missing_ids = form_ids - existing_form_ids
+
+    if not missing_ids:
+        return []
+
+    console.print(f"[dim]Fetching {len(missing_ids)} external forms...[/dim]")
+
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def fetch_one(form_id: str) -> dict[str, Any] | None:
+        async with semaphore:
+            try:
+                form = await client.get(f"/forms/{form_id}")
+                form['external'] = True  # Mark as external
+                return form
+            except Exception as e:
+                console.print(f"[yellow]Could not fetch external form {form_id}: {e}[/yellow]")
+                return None
+
+    tasks = [fetch_one(fid) for fid in missing_ids]
+    results = await asyncio.gather(*tasks)
+
+    external_forms = [f for f in results if f is not None]
+    console.print(f"[green]Fetched {len(external_forms)} external forms[/green]")
+
+    return external_forms
+
+
 async def fetch_solution(
     client: VeociClient,
     container_id: str,

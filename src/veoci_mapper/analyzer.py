@@ -86,6 +86,11 @@ def extract_relationships(form_definition: dict[str, Any]) -> list[Relationship]
     return relationships
 
 
+def get_referenced_ids(relationships: list[Relationship]) -> set[str]:
+    """Get all target IDs from relationships."""
+    return {r.target_id for r in relationships if r.target_type == "form"}
+
+
 def analyze_solution(form_definitions: list[dict[str, Any]]) -> list[Relationship]:
     """Analyze all forms in a solution and extract relationships.
 

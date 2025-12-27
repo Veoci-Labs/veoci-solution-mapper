@@ -3,395 +3,513 @@
   "forms": [
     {
       "id": "89673305",
-      "name": "Test Case analysis"
+      "name": "Test Case analysis",
+      "external": false
     },
     {
       "id": "376741494",
-      "name": "stage client tickets not yet deployed to stage"
+      "name": "stage client tickets not yet deployed to stage",
+      "external": false
     },
     {
       "id": "1315059808",
-      "name": "UAT Issue Reporting"
+      "name": "UAT Issue Reporting",
+      "external": false
     },
     {
       "id": "922439935",
-      "name": "WCAG Audit"
+      "name": "WCAG Audit",
+      "external": false
     },
     {
       "id": "171052853",
-      "name": "Dev Team Ticket Proxy"
+      "name": "Dev Team Ticket Proxy",
+      "external": false
     },
     {
       "id": "1293594",
-      "name": "Logins"
+      "name": "Logins",
+      "external": false
     },
     {
       "id": "31809772",
-      "name": "Veoci Ticket"
+      "name": "Veoci Ticket",
+      "external": false
     },
     {
       "id": "376724094",
-      "name": "stage-stash tickets not yet deployed to stage"
+      "name": "stage-stash tickets not yet deployed to stage",
+      "external": false
     },
     {
       "id": "94683563",
-      "name": "Emergency Contacts"
+      "name": "Emergency Contacts",
+      "external": false
     },
     {
       "id": "1413306669",
-      "name": "Copilot Usage Metrics"
+      "name": "Copilot Usage Metrics",
+      "external": false
     },
     {
       "id": "493763199",
-      "name": "Tickets with undeployed pull requests"
+      "name": "Tickets with undeployed pull requests",
+      "external": false
     },
     {
       "id": "328070303",
-      "name": "Form and Workflow Builder Questionnaire"
+      "name": "Form and Workflow Builder Questionnaire",
+      "external": false
     },
     {
       "id": "375082057",
-      "name": "Organization IDs"
+      "name": "Organization IDs",
+      "external": false
     },
     {
       "id": "94683569",
-      "name": "Employee Follow-up Worksheet"
+      "name": "Employee Follow-up Worksheet",
+      "external": false
     },
     {
       "id": "376736110",
-      "name": "stage branch tickets not yet deployed to stage"
+      "name": "stage branch tickets not yet deployed to stage",
+      "external": false
     },
     {
       "id": "432058589",
-      "name": "Reporting:  Dev Tickets For Customer Subform"
+      "name": "Reporting:  Dev Tickets For Customer Subform",
+      "external": false
     },
     {
       "id": "94683578",
-      "name": "Employee SWOT Analysis"
+      "name": "Employee SWOT Analysis",
+      "external": false
     },
     {
       "id": "632151474",
-      "name": "Tester Stats"
+      "name": "Tester Stats",
+      "external": false
     },
     {
       "id": "94683522",
-      "name": "Benefit Dependents Form"
+      "name": "Benefit Dependents Form",
+      "external": false
     },
     {
       "id": "94683523",
-      "name": "Benefits Enrollment Form"
+      "name": "Benefits Enrollment Form",
+      "external": false
     },
     {
       "id": "94683535",
-      "name": "Complete Veoci Profile"
+      "name": "Complete Veoci Profile",
+      "external": false
     },
     {
       "id": "20319771",
-      "name": "Home Page Audit"
+      "name": "Home Page Audit",
+      "external": false
     },
     {
       "id": "94675092",
-      "name": "I-9"
+      "name": "I-9",
+      "external": false
     },
     {
       "id": "28857994",
-      "name": "Daily Effort Analysis"
+      "name": "Daily Effort Analysis",
+      "external": false
     },
     {
       "id": "94683542",
-      "name": "Development Plan Activity"
+      "name": "Development Plan Activity",
+      "external": false
     },
     {
       "id": "376740167",
-      "name": "stage-stash client tickets not yet deployed to stage"
+      "name": "stage-stash client tickets not yet deployed to stage",
+      "external": false
     },
     {
       "id": "96986354",
-      "name": "New Employee Launch Form"
+      "name": "New Employee Launch Form",
+      "external": false
     },
     {
       "id": "94683538",
-      "name": "Development Focus"
+      "name": "Development Focus",
+      "external": false
     },
     {
       "id": "748682406",
-      "name": "Reporting:  Dev Tickets For Customer Parent (w/ CRM 2.0)"
+      "name": "Reporting:  Dev Tickets For Customer Parent (w/ CRM 2.0)",
+      "external": false
     },
     {
       "id": "94683551",
-      "name": "Emergency Contact Form"
+      "name": "Emergency Contact Form",
+      "external": false
     },
     {
       "id": "94683545",
-      "name": "Direct Deposit Authorization Form"
+      "name": "Direct Deposit Authorization Form",
+      "external": false
     },
     {
       "id": "94675098",
-      "name": "W4"
+      "name": "W4",
+      "external": false
     },
     {
       "id": "94683618",
-      "name": "Life Insurance Beneficiary Form"
+      "name": "Life Insurance Beneficiary Form",
+      "external": false
     },
     {
       "id": "35430484",
-      "name": "Bugsnag Errors"
+      "name": "Bugsnag Errors",
+      "external": false
     },
     {
       "id": "1180005146",
-      "name": "Dev Roadmap"
+      "name": "Dev Roadmap",
+      "external": false
     },
     {
       "id": "94683627",
-      "name": "New Employee Checklist"
+      "name": "New Employee Checklist",
+      "external": false
     },
     {
       "id": "325972",
-      "name": "Organizations"
+      "name": "Organizations",
+      "external": false
     },
     {
       "id": "462442436",
-      "name": "Attachments"
+      "name": "Attachments",
+      "external": false
     },
     {
       "id": "1408780706",
-      "name": "Email Groups"
+      "name": "Email Groups",
+      "external": false
     },
     {
       "id": "20287598",
-      "name": "Contracts Database"
+      "name": "Contracts Database",
+      "external": false
     },
     {
       "id": "649164780",
-      "name": "Ticket Milestone Migration"
+      "name": "Ticket Milestone Migration",
+      "external": false
     },
     {
       "id": "11149556",
-      "name": "A - New Customer Updates"
+      "name": "A - New Customer Updates",
+      "external": false
     },
     {
       "id": "94683642",
-      "name": "Request Employee Badge"
+      "name": "Request Employee Badge",
+      "external": false
     },
     {
       "id": "672937084",
-      "name": "Backlog Statistics"
+      "name": "Backlog Statistics",
+      "external": false
     },
     {
       "id": "94683589",
-      "name": "Flexible Spending Accounts"
+      "name": "Flexible Spending Accounts",
+      "external": false
     },
     {
       "id": "1026077001",
-      "name": "By Week"
+      "name": "By Week",
+      "external": false
     },
     {
       "id": "808855381",
-      "name": "Common Fields"
+      "name": "Common Fields",
+      "external": false
     },
     {
       "id": "1121871803",
-      "name": "By OS"
+      "name": "By OS",
+      "external": false
     },
     {
       "id": "1558751875",
-      "name": "Verticals Event/Conference Planning 2026"
+      "name": "Verticals Event/Conference Planning 2026",
+      "external": false
     },
     {
       "id": "101524323",
-      "name": "Action Items"
+      "name": "Action Items",
+      "external": false
     },
     {
       "id": "94683606",
-      "name": "Goals"
+      "name": "Goals",
+      "external": false
     },
     {
       "id": "749035222",
-      "name": "Reporting:  Dev Tickets For Customer Subform (w/ CRM 2.0)"
+      "name": "Reporting:  Dev Tickets For Customer Subform (w/ CRM 2.0)",
+      "external": false
     },
     {
       "id": "153699932",
-      "name": "GWS Processes Documentation"
+      "name": "GWS Processes Documentation",
+      "external": false
     },
     {
       "id": "94683603",
-      "name": "Goal Setting"
+      "name": "Goal Setting",
+      "external": false
     },
     {
       "id": "1077265997",
-      "name": "Logins by Month by Org"
+      "name": "Logins by Month by Org",
+      "external": false
     },
     {
       "id": "1523260336",
-      "name": "Campaigns"
+      "name": "Campaigns",
+      "external": false
     },
     {
       "id": "805925234",
-      "name": "Team Stats - Monthly Analytics"
+      "name": "Team Stats - Monthly Analytics",
+      "external": false
     },
     {
       "id": "94683610",
-      "name": "Gym Membership Form"
+      "name": "Gym Membership Form",
+      "external": false
     },
     {
       "id": "31965848",
-      "name": "Milestones"
+      "name": "Milestones",
+      "external": false
     },
     {
       "id": "376739063",
-      "name": "master branch tickets not yet deployed to stage"
+      "name": "master branch tickets not yet deployed to stage",
+      "external": false
     },
     {
       "id": "41040629",
-      "name": "Shared Fields - For Reference - Do Not Move"
+      "name": "Shared Fields - For Reference - Do Not Move",
+      "external": false
     },
     {
       "id": "697096989",
-      "name": "Github Activities"
+      "name": "Github Activities",
+      "external": false
     },
     {
       "id": "1199374831",
-      "name": "Primary Focus Highlight"
+      "name": "Primary Focus Highlight",
+      "external": false
     },
     {
       "id": "25831196",
-      "name": "GitHub Pull Requests"
+      "name": "GitHub Pull Requests",
+      "external": false
     },
     {
       "id": "432057945",
-      "name": "Reporting:  Dev Tickets For Customer Parent"
+      "name": "Reporting:  Dev Tickets For Customer Parent",
+      "external": false
     },
     {
       "id": "1098956058",
-      "name": "Accessibility Ticketing"
+      "name": "Accessibility Ticketing",
+      "external": false
     },
     {
       "id": "619386992",
-      "name": "Dev Stats"
+      "name": "Dev Stats",
+      "external": false
     },
     {
       "id": "1528426114",
-      "name": "Developer Job Descriptions"
+      "name": "Developer Job Descriptions",
+      "external": false
     },
     {
       "id": "1024106901",
-      "name": "UAT Ticketing (old - do not use)"
+      "name": "UAT Ticketing (old - do not use)",
+      "external": false
     },
     {
       "id": "34330025",
-      "name": "Not Used_Contracts - Shared with Veoci Team"
+      "name": "Not Used_Contracts - Shared with Veoci Team",
+      "external": false
     },
     {
       "id": "287695745",
-      "name": "subform with lookup"
+      "name": "subform with lookup",
+      "external": false
     },
     {
       "id": "376742098",
-      "name": "master branch client tickets not yet deployed to stage"
+      "name": "master branch client tickets not yet deployed to stage",
+      "external": false
     },
     {
       "id": "832810251",
-      "name": "SAML Configurations"
+      "name": "SAML Configurations",
+      "external": false
     },
     {
       "id": "832810250",
-      "name": "SAML Configurations - Button"
+      "name": "SAML Configurations - Button",
+      "external": false
     },
     {
       "id": "1473038693",
-      "name": "Veoci Copilot MCP Tool Call Log"
+      "name": "Veoci Copilot MCP Tool Call Log",
+      "external": false
     },
     {
       "id": "1257978959",
-      "name": "Sonar Issues"
+      "name": "Sonar Issues",
+      "external": false
     },
     {
       "id": "28854797",
-      "name": "Dates / Releases"
+      "name": "Dates / Releases",
+      "external": false
     },
     {
       "id": "258269650",
-      "name": "Milestone Analysis per Project"
+      "name": "Milestone Analysis per Project",
+      "external": false
     },
     {
       "id": "923167920",
-      "name": "Team Coverage - Features"
+      "name": "Team Coverage - Features",
+      "external": false
     },
     {
       "id": "171053196",
-      "name": "QA Team - Dev Ticket Proxy"
+      "name": "QA Team - Dev Ticket Proxy",
+      "external": false
     },
     {
       "id": "1273004072",
-      "name": "Baylor Pivot of Users"
+      "name": "Baylor Pivot of Users",
+      "external": false
     },
     {
       "id": "776129419",
-      "name": "Vertical Teams Information"
+      "name": "Vertical Teams Information",
+      "external": false
     },
     {
       "id": "180125559",
-      "name": "Report Issue - Dev Ticket Proxy"
+      "name": "Report Issue - Dev Ticket Proxy",
+      "external": false
     },
     {
       "id": "461702993",
-      "name": "GWS Processes Data Entity Relationship Diagrams"
+      "name": "GWS Processes Data Entity Relationship Diagrams",
+      "external": false
     },
     {
       "id": "29579284",
-      "name": "Industry - Sub-Industry DB"
+      "name": "Industry - Sub-Industry DB",
+      "external": false
     },
     {
       "id": "1206457655",
-      "name": "Infrastructure Deploy Instructions Per Region"
+      "name": "Infrastructure Deploy Instructions Per Region",
+      "external": false
     },
     {
       "id": "192679832",
-      "name": "GWS - Subform: Registration Status"
+      "name": "GWS - Subform: Registration Status",
+      "external": false
     },
     {
       "id": "180592420",
-      "name": "Mobile Beta Signup"
+      "name": "Mobile Beta Signup",
+      "external": false
     },
     {
       "id": "215032121",
-      "name": "Veoci New Feedback"
+      "name": "Veoci New Feedback",
+      "external": false
     },
     {
       "id": "41149599",
-      "name": "Milestone Analysis"
+      "name": "Milestone Analysis",
+      "external": false
     },
     {
       "id": "1528353526",
-      "name": "Developer Analytics"
+      "name": "Developer Analytics",
+      "external": false
     },
     {
       "id": "1206468632",
-      "name": "Infrastructure Deployment Request"
+      "name": "Infrastructure Deployment Request",
+      "external": false
     },
     {
       "id": "1545501165",
-      "name": "Release Notes"
+      "name": "Release Notes",
+      "external": false
     },
     {
       "id": "233638936",
-      "name": "Bug Count Tracker"
+      "name": "Bug Count Tracker",
+      "external": false
     },
     {
       "id": "28857165",
-      "name": "Development breakdown"
+      "name": "Development breakdown",
+      "external": false
     },
     {
       "id": "697106293",
-      "name": "Github Users"
+      "name": "Github Users",
+      "external": false
     },
     {
       "id": "38975913",
-      "name": "Errorenous Tickets"
+      "name": "Errorenous Tickets",
+      "external": false
     },
     {
       "id": "207872414",
-      "name": "Ticket Status Analysis"
+      "name": "Ticket Status Analysis",
+      "external": false
+    },
+    {
+      "id": "682676050",
+      "name": "Account",
+      "external": true
+    },
+    {
+      "id": "682676072",
+      "name": "Contract Management - Contract #s and $s",
+      "external": true
+    },
+    {
+      "id": "682676094",
+      "name": "Opportunity",
+      "external": true
+    },
+    {
+      "id": "1386668425",
+      "name": "Account Health Room Link",
+      "external": true
     }
   ],
   "workflows": [
@@ -1000,7 +1118,7 @@
   ],
   "statistics": {
     "total_nodes": 109,
-    "form_count": 98,
+    "form_count": 102,
     "workflow_count": 6,
     "total_edges": 55,
     "edge_types": {
