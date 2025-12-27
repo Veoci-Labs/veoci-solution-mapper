@@ -7,8 +7,10 @@ import typer
 from dotenv import load_dotenv
 from rich.console import Console
 
+from veoci_mapper.analyzer import analyze_solution
 from veoci_mapper.client import VeociClient
 from veoci_mapper.fetcher import fetch_solution
+from veoci_mapper.graph import build_graph, get_graph_stats
 
 load_dotenv()
 
@@ -78,12 +80,29 @@ async def _fetch_and_report(room_id: str, token: str, base_url: str) -> None:
     async with VeociClient(token=token, base_url=base_url) as client:
         solution = await fetch_solution(client, room_id)
 
+    # Analyze relationships
+    relationships = analyze_solution(solution["form_definitions"])
+
+    # Build graph
+    graph = build_graph(solution["forms"], solution["workflows"], relationships)
+    stats = get_graph_stats(graph)
+
     # Report summary
     console.print("\n[bold]Summary:[/bold]")
     console.print(f"  Container ID: {solution['container_id']}")
     console.print(f"  Forms: {len(solution['forms'])}")
     console.print(f"  Form definitions: {len(solution['form_definitions'])}")
     console.print(f"  Workflows: {len(solution['workflows'])}")
+
+    console.print("\n[bold]Graph Statistics:[/bold]")
+    console.print(
+        f"  Nodes: {stats['total_nodes']} "
+        f"({stats['form_count']} forms, {stats['workflow_count']} workflows)"
+    )
+    console.print(f"  Edges: {stats['total_edges']}")
+    console.print(f"  Isolated: {stats['isolated_nodes']}")
+    console.print(f"  Components: {stats['connected_components']}")
+
     console.print("\n[green]Fetch complete![/green]")
 
 

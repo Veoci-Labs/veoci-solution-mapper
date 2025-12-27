@@ -20,6 +20,11 @@ from veoci_mapper.fetcher import (
     fetch_solution,
     fetch_workflows_list,
 )
+from veoci_mapper.graph import (
+    build_graph,
+    get_graph_stats,
+    get_node_neighbors,
+)
 
 __version__ = "0.1.0"
 
@@ -38,4 +43,7 @@ __all__ = [
     "FORM_ENTRY",
     "LOOKUP",
     "WORKFLOW",
+    "build_graph",
+    "get_graph_stats",
+    "get_node_neighbors",
 ]
