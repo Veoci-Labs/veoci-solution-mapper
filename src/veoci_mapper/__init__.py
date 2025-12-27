@@ -1,5 +1,14 @@
 """Veoci Solution Mapper - CLI tool to map Veoci solution structure and dependencies."""
 
+from veoci_mapper.analyzer import (
+    FORM_ENTRY,
+    LOOKUP,
+    REFERENCE,
+    WORKFLOW,
+    Relationship,
+    analyze_solution,
+    extract_relationships,
+)
 from veoci_mapper.client import (
     AuthenticationError,
     NotFoundError,
@@ -22,4 +31,11 @@ __all__ = [
     "fetch_solution",
     "fetch_forms_list",
     "fetch_workflows_list",
+    "Relationship",
+    "extract_relationships",
+    "analyze_solution",
+    "REFERENCE",
+    "FORM_ENTRY",
+    "LOOKUP",
+    "WORKFLOW",
 ]
