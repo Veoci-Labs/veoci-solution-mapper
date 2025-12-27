@@ -1,11 +1,14 @@
 """CLI interface for Veoci Solution Mapper."""
 
+import asyncio
 from pathlib import Path
-from typing import Optional
 
-from dotenv import load_dotenv
 import typer
+from dotenv import load_dotenv
 from rich.console import Console
+
+from veoci_mapper.client import VeociClient
+from veoci_mapper.fetcher import fetch_solution
 
 load_dotenv()
 
@@ -31,6 +34,13 @@ def map(
         "-t",
         help="Veoci API token",
         envvar="VEOCI_TOKEN",
+    ),
+    base_url: str = typer.Option(
+        "https://veoci.com",
+        "--base-url",
+        "-u",
+        help="Veoci base URL",
+        envvar="VEOCI_BASE_URL",
     ),
     output: Path = typer.Option(
         Path.cwd(),
@@ -58,7 +68,23 @@ def map(
         console.print("[yellow]Interactive mode enabled (not yet implemented)[/yellow]")
 
     console.print(f"Output directory: {output}")
-    console.print("[dim]Placeholder - implementation pending[/dim]")
+
+    # Run async fetch
+    asyncio.run(_fetch_and_report(room_id, token, base_url))
+
+
+async def _fetch_and_report(room_id: str, token: str, base_url: str) -> None:
+    """Fetch solution data and report summary."""
+    async with VeociClient(token=token, base_url=base_url) as client:
+        solution = await fetch_solution(client, room_id)
+
+    # Report summary
+    console.print("\n[bold]Summary:[/bold]")
+    console.print(f"  Container ID: {solution['container_id']}")
+    console.print(f"  Forms: {len(solution['forms'])}")
+    console.print(f"  Form definitions: {len(solution['form_definitions'])}")
+    console.print(f"  Workflows: {len(solution['workflows'])}")
+    console.print("\n[green]Fetch complete![/green]")
 
 
 def main() -> None:

@@ -6,6 +6,11 @@ from veoci_mapper.client import (
     VeociClient,
     VeociClientError,
 )
+from veoci_mapper.fetcher import (
+    fetch_forms_list,
+    fetch_solution,
+    fetch_workflows_list,
+)
 
 __version__ = "0.1.0"
 
@@ -14,4 +19,7 @@ __all__ = [
     "VeociClientError",
     "AuthenticationError",
     "NotFoundError",
+    "fetch_solution",
+    "fetch_forms_list",
+    "fetch_workflows_list",
 ]
