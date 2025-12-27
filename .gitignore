@@ -41,4 +41,5 @@ Thumbs.db
 
 # Output directories
 output/
+results/
 test-output/
