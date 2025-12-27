@@ -42,13 +42,23 @@ def build_graph(
 
     # Add relationship edges
     for rel in relationships:
-        graph.add_edge(
-            rel.source_id,
-            rel.target_id,
-            relationship_type=rel.relationship_type,
-            field_name=rel.field_name,
-            target_type=rel.target_type,
-        )
+        edge_data = {
+            "relationship_type": rel.relationship_type,
+            "field_name": rel.field_name,
+            "target_type": rel.target_type,
+        }
+
+        # Add action metadata if present
+        if rel.action_id:
+            edge_data["action_id"] = rel.action_id
+            edge_data["action_name"] = rel.action_name
+            edge_data["trigger_type"] = rel.trigger_type
+            edge_data["automatic"] = rel.automatic
+            edge_data["edge_category"] = "action"
+        else:
+            edge_data["edge_category"] = "field"
+
+        graph.add_edge(rel.source_id, rel.target_id, **edge_data)
 
     return graph
 
@@ -58,11 +68,19 @@ def get_graph_stats(graph: nx.DiGraph) -> dict[str, Any]:
     form_nodes = [n for n, d in graph.nodes(data=True) if d.get("node_type") == "form"]
     workflow_nodes = [n for n, d in graph.nodes(data=True) if d.get("node_type") == "workflow"]
 
-    # Count edges by relationship type
+    # Count edges by relationship type and category
     edge_types: dict[str, int] = {}
+    action_edges = 0
+    field_edges = 0
     for _, _, data in graph.edges(data=True):
         rel_type = data.get("relationship_type", "unknown")
         edge_types[rel_type] = edge_types.get(rel_type, 0) + 1
+
+        # Count by edge category
+        if data.get("edge_category") == "action":
+            action_edges += 1
+        elif data.get("edge_category") == "field":
+            field_edges += 1
 
     # Find isolated nodes (no connections)
     isolated = list(nx.isolates(graph))
@@ -76,16 +94,20 @@ def get_graph_stats(graph: nx.DiGraph) -> dict[str, Any]:
         "form_count": len(form_nodes),
         "workflow_count": len(workflow_nodes),
         "total_edges": graph.number_of_edges(),
+        "action_edges": action_edges,
+        "field_edges": field_edges,
         "edge_types": edge_types,
         "isolated_nodes": len(isolated),
         "connected_components": nx.number_weakly_connected_components(graph),
         "most_referenced": [
             {"id": n, "name": graph.nodes[n].get("name"), "count": c}
-            for n, c in in_degrees if c > 0
+            for n, c in in_degrees
+            if c > 0
         ],
         "most_referencing": [
             {"id": n, "name": graph.nodes[n].get("name"), "count": c}
-            for n, c in out_degrees if c > 0
+            for n, c in out_degrees
+            if c > 0
         ],
     }
 
@@ -101,23 +123,27 @@ def get_node_neighbors(graph: nx.DiGraph, node_id: str) -> dict[str, Any]:
     predecessors = []
     for pred in graph.predecessors(node_id):
         edge_data = graph.edges[pred, node_id]
-        predecessors.append({
-            "id": pred,
-            "name": graph.nodes[pred].get("name"),
-            "relationship": edge_data.get("relationship_type"),
-            "field": edge_data.get("field_name"),
-        })
+        predecessors.append(
+            {
+                "id": pred,
+                "name": graph.nodes[pred].get("name"),
+                "relationship": edge_data.get("relationship_type"),
+                "field": edge_data.get("field_name"),
+            }
+        )
 
     # Outgoing edges (what this node references)
     successors = []
     for succ in graph.successors(node_id):
         edge_data = graph.edges[node_id, succ]
-        successors.append({
-            "id": succ,
-            "name": graph.nodes[succ].get("name"),
-            "relationship": edge_data.get("relationship_type"),
-            "field": edge_data.get("field_name"),
-        })
+        successors.append(
+            {
+                "id": succ,
+                "name": graph.nodes[succ].get("name"),
+                "relationship": edge_data.get("relationship_type"),
+                "field": edge_data.get("field_name"),
+            }
+        )
 
     return {
         "id": node_id,

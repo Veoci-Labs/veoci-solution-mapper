@@ -1,6 +1,7 @@
 """CLI interface for Veoci Solution Mapper."""
 
 import asyncio
+import logging
 import os
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import questionary
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.panel import Panel
 
 from veoci_mapper.analyzer import analyze_solution, get_referenced_ids
@@ -33,6 +35,17 @@ app = typer.Typer(
 console = Console()
 
 
+def configure_logging(debug: bool = False) -> None:
+    """Configure logging level based on debug flag."""
+    level = logging.DEBUG if debug else logging.WARNING
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        handlers=[RichHandler(console=console)],
+        force=True,  # Allow reconfiguration
+    )
+
+
 async def run_map(
     room_id: str,
     token: str,
@@ -49,9 +62,12 @@ async def run_map(
             # Fetch solution data
             solution = await fetch_solution(client, room_id)
 
-            # Analyze relationships
+            # Extract actions from solution
+            actions = solution.get("actions", {})
+
+            # Analyze relationships (field + action)
             console.print("[dim]Analyzing relationships...[/dim]")
-            relationships = analyze_solution(solution["form_definitions"])
+            relationships = analyze_solution(solution["form_definitions"], actions=actions)
             console.print(f"[green]Found {len(relationships)} relationships[/green]")
 
             # Fetch external forms
@@ -253,10 +269,7 @@ def run_interactive() -> None:
         if open_in_browser(dashboard_path):
             console.print("[green]Dashboard opened![/green]")
         else:
-            msg = (
-                "[yellow]Couldn't open automatically. "
-                f"Open manually:[/yellow] {dashboard_path}"
-            )
+            msg = f"[yellow]Couldn't open automatically. Open manually:[/yellow] {dashboard_path}"
             console.print(msg)
 
 
@@ -299,8 +312,17 @@ def map(
         "--no-open",
         help="Don't open dashboard in browser when complete",
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        "-d",
+        help="Enable debug logging (shows HTTP requests, etc.)",
+    ),
 ) -> None:
     """Map a Veoci solution and generate visualizations."""
+
+    # Configure logging based on debug flag
+    configure_logging(debug)
 
     # Interactive mode
     if interactive:

@@ -13,8 +13,13 @@ class Relationship(BaseModel):
     target_id: str
     target_name: str | None
     target_type: str  # "form" or "workflow"
-    relationship_type: str  # REFERENCE, FORM_ENTRY, LOOKUP, WORKFLOW
-    field_name: str
+    relationship_type: str  # REFERENCE, FORM_ENTRY, LOOKUP, WORKFLOW, ACTION_*
+    field_name: str | None = None  # Optional - actions don't have field names
+    # Action metadata (only populated for action-based relationships)
+    action_id: str | None = None
+    action_name: str | None = None
+    trigger_type: str | None = None
+    automatic: bool | None = None
 
 
 # Relationship types
@@ -22,6 +27,13 @@ REFERENCE = "REFERENCE"
 FORM_ENTRY = "FORM_ENTRY"
 LOOKUP = "LOOKUP"
 WORKFLOW = "WORKFLOW"
+
+# Action-based relationship types
+ACTION_CREATES_ENTRY = "ACTION_CREATES_ENTRY"
+ACTION_INVOKES_WORKFLOW = "ACTION_INVOKES_WORKFLOW"
+ACTION_CREATES_TASK = "ACTION_CREATES_TASK"
+ACTION_LAUNCHES_TEMPLATE = "ACTION_LAUNCHES_TEMPLATE"
+ACTION_LAUNCHES_PLAN = "ACTION_LAUNCHES_PLAN"
 
 
 def extract_relationships(form_definition: dict[str, Any]) -> list[Relationship]:
@@ -86,16 +98,144 @@ def extract_relationships(form_definition: dict[str, Any]) -> list[Relationship]
     return relationships
 
 
+def extract_action_relationships(
+    source_id: str,
+    source_name: str,
+    source_type: str,
+    actions: list[dict[str, Any]],
+) -> list[Relationship]:
+    """Extract relationships from custom actions.
+
+    Args:
+        source_id: The form or workflow ID that owns these actions
+        source_name: The form or workflow name
+        source_type: "form" or "workflow"
+        actions: List of action definitions from the API
+
+    Returns:
+        List of Relationship objects derived from actions
+    """
+    relationships: list[Relationship] = []
+
+    for action in actions:
+        action_id = str(action.get("id", ""))
+        action_name = action.get("name", "Unknown Action")
+        consequence_type = action.get("consequenceType", "")
+        trigger_type = action.get("eventType", "")
+        automatic = action.get("automatic", False)
+
+        # Skip REST API calls - not data relationships
+        if consequence_type == "CALL_REST_API":
+            continue
+
+        params = action.get("consequenceParams", {})
+        if not isinstance(params, dict):
+            continue
+
+        target_object_type = params.get("targetObjectType")
+
+        # Skip emails and SQL reports (11=SQL, 16/21/22=Email variants)
+        if target_object_type in [11, 16, 21, 22]:
+            continue
+
+        # Map targetObjectType to relationship type and target field
+        relationship_type = None
+        target_id = None
+        target_type = None
+
+        if target_object_type == 5:  # Form
+            relationship_type = ACTION_CREATES_ENTRY
+            target_type = "form"
+            # Only create relationship if we have an explicit target form ID
+            target_id = params.get("targetForm")
+
+        elif target_object_type == 9:  # Workflow
+            relationship_type = ACTION_INVOKES_WORKFLOW
+            target_type = "workflow"
+            target_id = params.get("targetProcess")
+
+        elif target_object_type == 3:  # Task
+            relationship_type = ACTION_CREATES_TASK
+            target_type = "form"  # Tasks are form-like entities
+            target_id = params.get("targetTaskType")
+
+        # Add relationship if we found a valid target
+        if relationship_type and target_id:
+            relationships.append(
+                Relationship(
+                    source_id=source_id,
+                    source_name=source_name,
+                    target_id=str(target_id),
+                    target_name=None,  # Will be resolved during analysis
+                    target_type=target_type,
+                    relationship_type=relationship_type,
+                    field_name=None,  # Actions don't have field names
+                    action_id=action_id,
+                    action_name=action_name,
+                    trigger_type=trigger_type,
+                    automatic=automatic,
+                )
+            )
+
+        # Check for template/plan launches via targetContainerType
+        target_container_type = params.get("targetContainerType")
+
+        if target_container_type == 5:  # Room Template
+            container_id = params.get("targetContainerId")
+            if container_id:
+                relationships.append(
+                    Relationship(
+                        source_id=source_id,
+                        source_name=source_name,
+                        target_id=str(container_id),
+                        target_name=None,
+                        target_type="template",
+                        relationship_type=ACTION_LAUNCHES_TEMPLATE,
+                        field_name=None,
+                        action_id=action_id,
+                        action_name=action_name,
+                        trigger_type=trigger_type,
+                        automatic=automatic,
+                    )
+                )
+
+        elif target_container_type == 7:  # Plan
+            container_id = params.get("targetContainerId")
+            if container_id:
+                relationships.append(
+                    Relationship(
+                        source_id=source_id,
+                        source_name=source_name,
+                        target_id=str(container_id),
+                        target_name=None,
+                        target_type="plan",
+                        relationship_type=ACTION_LAUNCHES_PLAN,
+                        field_name=None,
+                        action_id=action_id,
+                        action_name=action_name,
+                        trigger_type=trigger_type,
+                        automatic=automatic,
+                    )
+                )
+
+    return relationships
+
+
 def get_referenced_ids(relationships: list[Relationship]) -> set[str]:
     """Get all target IDs from relationships."""
     return {r.target_id for r in relationships if r.target_type == "form"}
 
 
-def analyze_solution(form_definitions: list[dict[str, Any]]) -> list[Relationship]:
+def analyze_solution(
+    form_definitions: list[dict[str, Any]],
+    actions: dict[str, list[dict[str, Any]]] | None = None,
+) -> list[Relationship]:
     """Analyze all forms in a solution and extract relationships.
 
     Args:
         form_definitions: List of form definition dicts
+        actions: Optional dict mapping object IDs to their action lists
+                 Format: {object_id: [action1, action2, ...]}
 
     Returns:
         Combined list of all relationships, deduplicated
@@ -103,8 +243,24 @@ def analyze_solution(form_definitions: list[dict[str, Any]]) -> list[Relationshi
     all_relationships: list[Relationship] = []
 
     for form in form_definitions:
+        # Extract field-based relationships
         relationships = extract_relationships(form)
         all_relationships.extend(relationships)
+
+        # Extract action-based relationships if actions provided
+        if actions:
+            form_id = str(form.get("id", ""))
+            form_name = form.get("name", "Unknown")
+            form_actions = actions.get(form_id, [])
+
+            if form_actions:
+                action_relationships = extract_action_relationships(
+                    source_id=form_id,
+                    source_name=form_name,
+                    source_type="form",
+                    actions=form_actions,
+                )
+                all_relationships.extend(action_relationships)
 
     # Deduplicate based on all fields
     seen = set()
@@ -112,12 +268,14 @@ def analyze_solution(form_definitions: list[dict[str, Any]]) -> list[Relationshi
 
     for rel in all_relationships:
         # Create tuple of all significant fields for deduplication
+        # Include action_id to differentiate multiple actions with same targets
         key = (
             rel.source_id,
             rel.target_id,
             rel.target_type,
             rel.relationship_type,
             rel.field_name,
+            rel.action_id,  # None for field relationships, unique for actions
         )
 
         if key not in seen:

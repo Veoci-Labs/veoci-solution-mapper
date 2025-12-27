@@ -19,12 +19,6 @@ def generate_summary_prompt(
 ) -> str:
     """Generate the prompt for Gemini to summarize the solution."""
 
-    # Get connected forms (non-isolated)
-    connected_forms = [
-        n for n in graph.nodes()
-        if graph.in_degree(n) > 0 or graph.out_degree(n) > 0
-    ]
-
     # Build form list with relationships
     form_details = []
     for form in forms:
@@ -46,7 +40,22 @@ def generate_summary_prompt(
 
     workflow_names = [w.get("name", "Unknown") for w in workflows]
 
+    # Extract custom actions from graph edges
+    action_details = []
+    for source, target, data in graph.edges(data=True):
+        if data.get("edge_category") == "action":
+            source_name = graph.nodes[source].get("name", source)
+            target_name = graph.nodes[target].get("name", target)
+            action_name = data.get("action_name", "Unknown action")
+            trigger = data.get("trigger_type", "Unknown")
+            rel_type = data.get("relationship_type", "ACTION")
+            action_details.append(
+                f"- {action_name}: {source_name} → {target_name} "
+                f"(trigger: {trigger}, type: {rel_type})"
+            )
+
     prompt = f"""Analyze this Veoci solution and write a clear, professional markdown summary.
+The primary goal is to help the user understand how this solution works and how its components interact.
 
 ## Solution Data
 
@@ -55,7 +64,9 @@ def generate_summary_prompt(
 **Statistics:**
 - Forms: {stats.get('form_count', 0)}
 - Workflows: {stats.get('workflow_count', 0)}
-- Relationships: {stats.get('total_edges', 0)}
+- Total Relationships: {stats.get('total_edges', 0)}
+- Action-based relationships: {stats.get('action_edges', 0)}
+- Field-based relationships: {stats.get('field_edges', 0)}
 - Connected components: {stats.get('connected_components', 0)}
 
 **Forms and their relationships:**
@@ -65,19 +76,43 @@ def generate_summary_prompt(
 **Workflows:**
 {chr(10).join(f"- {w}" for w in workflow_names)}
 
-**Most referenced forms:**
+**Custom Actions (automations that connect forms):**
+{chr(10).join(action_details[:20]) if action_details else "No custom actions found"}
+{"... and more" if len(action_details) > 20 else ""}
+
+**Most referenced forms (central to the solution):**
 {chr(10).join(f"- {item['name']} ({item['count']} references)" for item in stats.get('most_referenced', [])[:5])}
 
 ## Instructions
 
-Write a markdown document with these sections:
-1. **Overview** - What this solution appears to be for (infer from form/workflow names)
-2. **Key Components** - The most important forms and workflows
-3. **Data Flow** - How forms connect to each other (based on relationships)
-4. **Workflows** - What each workflow likely does
-5. **Recommendations** - Any observations about the solution structure
+Write a markdown document that helps the user understand this solution. Focus on clarity and practical understanding.
 
-Keep it concise but informative. Use bullet points. Be professional."""
+**Required sections (in order of importance):**
+
+1. **Overview** - What is this solution for? Infer the business purpose from form and workflow names. Be specific about what problems it solves.
+
+2. **Core Components** - Identify the central forms that anchor this solution. Explain what role each key form plays in the overall workflow.
+
+3. **How It Works** - Describe the data flow through the solution:
+   - How do forms connect to each other?
+   - What triggers create new entries or update data?
+   - How do workflows orchestrate the process?
+
+4. **Automations & Actions** - Explain the important custom actions:
+   - What do they do?
+   - When do they trigger?
+   - How do they connect different parts of the solution?
+
+5. **Supporting Components** - List any utility forms, reporting forms, or secondary components.
+
+6. **Notes** (optional, brief) - Any observations about potential improvements or notable patterns, but keep this short.
+
+**Guidelines:**
+- Prioritize helping the user understand what this solution DOES over analyzing its structure
+- Use plain language, not technical jargon
+- Be concise - bullet points are preferred
+- Focus on the "why" and "how" of the solution
+- Custom actions are important - they show how the solution automates work"""
 
     return prompt
 
