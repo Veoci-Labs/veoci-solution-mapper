@@ -31,6 +31,7 @@ from veoci_mapper.output import (
     generate_markdown_summary,
     open_in_browser,
 )
+from veoci_mapper.version import __version__, check_for_update, get_download_url
 
 load_dotenv()
 
@@ -39,6 +40,13 @@ app = typer.Typer(
     help="Map Veoci solution relationships and visualize form connections.",
 )
 console = Console()
+
+
+def version_callback(value: bool) -> None:
+    """Print version and exit."""
+    if value:
+        typer.echo(f"veoci-map version {__version__}")
+        raise typer.Exit()
 
 
 def configure_logging(debug: bool = False) -> None:
@@ -79,10 +87,7 @@ async def run_map(
                 )
                 # Extract container ID from each task type, or fall back to room_id
                 task_type_refs = [
-                    (
-                        str(tt.get("categoryId")),
-                        str(tt.get("container", {}).get("id", room_id))
-                    )
+                    (str(tt.get("categoryId")), str(tt.get("container", {}).get("id", room_id)))
                     for tt in task_types_list
                 ]
                 solution_task_types_dict = await fetch_all_task_type_definitions(
@@ -91,8 +96,7 @@ async def run_map(
                 )
                 solution_task_types = list(solution_task_types_dict.values())
                 console.print(
-                    f"[green]Fetched {len(solution_task_types)} "
-                    "task type definitions[/green]"
+                    f"[green]Fetched {len(solution_task_types)} task type definitions[/green]"
                 )
             else:
                 solution_task_types = []
@@ -166,8 +170,7 @@ async def run_map(
 
                 # Merge unique relationships
                 existing_rel_keys = {
-                    (r.source_id, r.target_id, r.field_name, r.action_id)
-                    for r in relationships
+                    (r.source_id, r.target_id, r.field_name, r.action_id) for r in relationships
                 }
                 added_count = 0
                 for rel in task_type_relationships:
@@ -214,12 +217,10 @@ async def run_map(
 
             # Build node type breakdown
             node_types = [f"{stats['form_count']} forms", f"{stats['workflow_count']} workflows"]
-            if stats.get('task_type_count', 0) > 0:
+            if stats.get("task_type_count", 0) > 0:
                 node_types.append(f"{stats['task_type_count']} task types")
 
-            console.print(
-                f"  Nodes: {stats['total_nodes']} ({', '.join(node_types)})"
-            )
+            console.print(f"  Nodes: {stats['total_nodes']} ({', '.join(node_types)})")
 
             # Count external nodes
             external_form_count = sum(1 for f in all_forms if f.get("external", False))
@@ -416,18 +417,41 @@ def run_interactive() -> None:
 
 @app.command()
 def map(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    ),
+    container: str = typer.Option(
+        None,
+        "--container",
+        "-c",
+        help="Veoci container ID (room) to map",
+    ),
+    pat: str = typer.Option(
+        None,
+        "--pat",
+        "-p",
+        envvar="VEOCI_TOKEN",
+        help="Personal Access Token (or set VEOCI_TOKEN env var)",
+    ),
+    # Hidden legacy aliases for backward compatibility
     room_id: str = typer.Option(
         None,
         "--room-id",
         "-r",
-        help="The Veoci room ID to map",
+        help="(deprecated: use --container)",
+        hidden=True,
     ),
     token: str = typer.Option(
         None,
         "--token",
         "-t",
-        envvar="VEOCI_TOKEN",
-        help="Veoci Personal Access Token (or set VEOCI_TOKEN env var)",
+        help="(deprecated: use --pat)",
+        hidden=True,
     ),
     base_url: str = typer.Option(
         "https://veoci.com",
@@ -440,7 +464,7 @@ def map(
         Path("./output"),
         "--output",
         "-o",
-        help="Output directory for generated files",
+        help="Output directory for generated files (default: ./output)",
     ),
     interactive: bool = typer.Option(
         False,
@@ -460,28 +484,45 @@ def map(
         help="Enable debug logging (shows HTTP requests, etc.)",
     ),
 ) -> None:
-    """Map a Veoci solution and generate visualizations."""
+    """Map a Veoci solution and generate visualizations.
+
+    Quick start (non-interactive):
+        veoci-map --pat YOUR_TOKEN --container CONTAINER_ID
+
+    The tool will fetch solution data, analyze relationships, and generate:
+      - Interactive HTML dashboard (auto-opens in browser)
+      - JSON export
+      - Mermaid diagram
+      - Markdown summary
+    """
 
     # Configure logging based on debug flag
     configure_logging(debug)
 
-    # Interactive mode
-    if interactive:
+    # Check for updates (non-blocking)
+    new_version = check_for_update()
+    if new_version:
+        typer.echo(f"[Update available: v{new_version}] {get_download_url()}", err=True)
+
+    # Resolve legacy aliases (prioritize new flags)
+    final_container = container or room_id
+    final_token = pat or token
+
+    # Interactive mode (explicit flag or missing required params)
+    if interactive or (not final_container and not final_token):
         run_interactive()
         return
 
-    # Non-interactive mode requires room_id
-    if not room_id:
-        console.print("[bold red]Error:[/bold red] --room-id is required (or use --interactive)")
+    # Non-interactive mode requires both container and token
+    if not final_container:
+        console.print("[bold red]Error:[/bold red] --container is required (or use --interactive)")
         raise typer.Exit(1)
 
-    if not token:
-        console.print(
-            "[bold red]Error:[/bold red] No token provided. Use --token or set VEOCI_TOKEN"
-        )
+    if not final_token:
+        console.print("[bold red]Error:[/bold red] No token provided. Use --pat or set VEOCI_TOKEN")
         raise typer.Exit(1)
 
-    asyncio.run(run_map(room_id, token, base_url, output, auto_open=not no_open))
+    asyncio.run(run_map(final_container, final_token, base_url, output, auto_open=not no_open))
 
 
 def main() -> None:

@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            platform: macos-arm64
+            binary: veoci-map
+            archive: veoci-map-macos-arm64.tar.gz
+          - os: macos-13
+            platform: macos-x64
+            binary: veoci-map
+            archive: veoci-map-macos-x64.tar.gz
+          - os: ubuntu-latest
+            platform: linux-x64
+            binary: veoci-map
+            archive: veoci-map-linux-x64.tar.gz
+          - os: windows-latest
+            platform: windows-x64
+            binary: veoci-map.exe
+            archive: veoci-map-windows-x64.zip
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -e .
+
+      - name: Inject Gemini API key
+        run: python3 build/inject_secret.py
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Build executable
+        run: pyinstaller veoci-map.spec --clean --noconfirm
+
+      - name: Create archive (Unix)
+        if: runner.os != 'Windows'
+        run: tar -czvf ${{ matrix.archive }} -C dist ${{ matrix.binary }}
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/${{ matrix.binary }} -DestinationPath ${{ matrix.archive }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: ${{ matrix.archive }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/macos-arm64/veoci-map-macos-arm64.tar.gz
+            artifacts/macos-x64/veoci-map-macos-x64.tar.gz
+            artifacts/linux-x64/veoci-map-linux-x64.tar.gz
+            artifacts/windows-x64/veoci-map-windows-x64.zip
+          generate_release_notes: true

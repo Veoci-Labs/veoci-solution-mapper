@@ -7,6 +7,8 @@ import networkx as nx
 
 from rich.console import Console
 
+from veoci_mapper.config import get_gemini_key
+
 console = Console()
 
 
@@ -129,7 +131,7 @@ async def generate_markdown_summary(
 
     Returns None if Gemini is not configured.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = get_gemini_key()
 
     if not api_key:
         console.print("[yellow]Skipping AI summary - GEMINI_API_KEY not set[/yellow]")
