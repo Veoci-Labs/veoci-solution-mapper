@@ -456,14 +456,16 @@ async def fetch_solution(
     console.print(f"[green]Fetched {len(form_definitions)} form definitions[/green]")
     advance()
 
-    # 5. Fetch custom actions for all forms and workflows
+    # 5. Fetch custom actions for all forms, workflows, and task types
     form_ids = [str(f.get("id") or f.get("formId")) for f in forms]
     workflow_ids = [str(w.get("id")) for w in workflows if w.get("id")]
-    all_object_ids = form_ids + workflow_ids
+    task_type_ids = [str(tt.get("categoryId")) for tt in task_types_list if tt.get("categoryId")]
+    all_object_ids = form_ids + workflow_ids + task_type_ids
 
     msg = (
         f"[dim]Fetching actions for {len(all_object_ids)} objects "
-        f"({len(form_ids)} forms, {len(workflow_ids)} workflows)...[/dim]"
+        f"({len(form_ids)} forms, {len(workflow_ids)} workflows, "
+        f"{len(task_type_ids)} task types)...[/dim]"
     )
     console.print(msg)
     actions = await fetch_all_object_actions(client, all_object_ids)
@@ -471,9 +473,11 @@ async def fetch_solution(
     # Count actions by type for logging
     form_action_count = sum(len(actions.get(fid, [])) for fid in form_ids)
     workflow_action_count = sum(len(actions.get(wid, [])) for wid in workflow_ids)
+    task_type_action_count = sum(len(actions.get(ttid, [])) for ttid in task_type_ids)
     console.print(
         f"[green]Fetched {form_action_count} form actions, "
-        f"{workflow_action_count} workflow actions[/green]"
+        f"{workflow_action_count} workflow actions, "
+        f"{task_type_action_count} task type actions[/green]"
     )
 
     # Debug: Check action data structure
