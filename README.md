@@ -58,9 +58,14 @@ For automation, bypass the wizard with flags:
 
 ## Troubleshooting
 
-### Mac: "unidentified developer" warning
+### Mac: "Cannot be opened" or "unidentified developer"
 
-Right-click the executable and select "Open", then click "Open" in the dialog. You only need to do this once.
+Run this command to remove the quarantine flag:
+```bash
+xattr -d com.apple.quarantine veoci-map
+```
+
+Then run `./veoci-map` normally. You only need to do this once.
 
 ### Windows: SmartScreen warning
 
