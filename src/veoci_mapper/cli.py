@@ -205,6 +205,7 @@ async def run_map(
                 all_workflows,
                 relationships,
                 task_types=all_task_types,
+                solution_container_id=room_id,
             )
             stats = get_graph_stats(graph)
 
@@ -265,6 +266,7 @@ async def run_map(
                 graph=graph,
                 markdown_summary=summary,
                 output_path=output_dir / "solution.html",
+                base_url=base_url,
             )
             console.print(f"  [green]✓[/green] Dashboard: {dashboard_path}")
 
