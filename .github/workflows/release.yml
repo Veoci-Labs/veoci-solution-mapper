@@ -16,7 +16,7 @@ jobs:
             platform: macos-arm64
             binary: veoci-map
             archive: veoci-map-macos-arm64.tar.gz
-          - os: macos-13
+          - os: macos-13-large
             platform: macos-x64
             binary: veoci-map
             archive: veoci-map-macos-x64.tar.gz
