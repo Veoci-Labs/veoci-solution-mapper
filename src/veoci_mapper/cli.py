@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 from pathlib import Path
 
 import questionary
@@ -14,6 +13,7 @@ from rich.panel import Panel
 
 from veoci_mapper.analyzer import analyze_solution, get_referenced_ids, get_referenced_workflow_ids
 from veoci_mapper.client import AuthenticationError, VeociClient
+from veoci_mapper.credentials import get_saved_pat, mask_pat, save_pat
 from veoci_mapper.fetcher import (
     fetch_all_task_type_definitions,
     fetch_external_forms,
@@ -316,103 +316,55 @@ async def run_map(
         raise typer.Exit(1)
 
 
-def run_interactive() -> None:
-    """Run interactive wizard mode."""
+def run_wizard() -> tuple[str, str]:
+    """Run streamlined wizard mode, return (pat, container_id)."""
 
-    console.print(
-        Panel.fit(
-            "[bold]Veoci Solution Mapper[/bold]\nMap forms, workflows, and their relationships",
-            border_style="blue",
-        )
-    )
-    console.print()
+    console.print("\n[bold]Welcome to Veoci Solution Mapper[/bold]\n")
 
-    # Get base URL
-    base_url = questionary.text(
-        "Veoci API URL:",
-        default=os.getenv("VEOCI_BASE_URL", "https://veoci.com"),
-    ).ask()
-
-    if base_url is None:  # User cancelled
-        raise typer.Exit(0)
-
-    # Get token (check env first)
-    env_token = os.getenv("VEOCI_TOKEN")
-    if env_token:
-        use_env = questionary.confirm(
-            "Use token from VEOCI_TOKEN environment variable?",
+    # PAT
+    saved_pat = get_saved_pat()
+    if saved_pat:
+        use_saved = questionary.confirm(
+            f"Use saved PAT ({mask_pat(saved_pat)})?",
             default=True,
         ).ask()
-        if use_env is None:
+        if use_saved is None:
             raise typer.Exit(0)
-        token = env_token if use_env else None
+
+        if use_saved:
+            pat = saved_pat
+        else:
+            new_pat = questionary.password("Enter your PAT:").ask()
+            if new_pat is None:
+                raise typer.Exit(0)
+            if not new_pat:
+                console.print("[red]PAT is required[/red]")
+                raise typer.Exit(1)
+            save_pat(new_pat)
+            pat = new_pat
     else:
-        token = None
-
-    if not token:
-        token = questionary.password(
-            "Personal Access Token (PAT):",
-        ).ask()
-
-        if not token:
-            console.print("[red]Token is required[/red]")
+        new_pat = questionary.password("Enter your Veoci PAT:").ask()
+        if new_pat is None:
+            raise typer.Exit(0)
+        if not new_pat:
+            console.print("[red]PAT is required[/red]")
             raise typer.Exit(1)
 
-    # Get room ID
-    room_id = questionary.text(
-        "Room ID to map:",
-        validate=lambda x: len(x) > 0 or "Room ID is required",
+        if questionary.confirm("Save PAT for future use?", default=True).ask():
+            save_pat(new_pat)
+
+        pat = new_pat
+
+    # Container
+    container = questionary.text(
+        "Enter container ID to map:",
+        validate=lambda x: len(x) > 0 or "Container ID is required",
     ).ask()
 
-    if room_id is None:
+    if container is None:
         raise typer.Exit(0)
 
-    # Get output directory
-    output_str = questionary.text(
-        "Output directory:",
-        default="./output",
-    ).ask()
-
-    if output_str is None:
-        raise typer.Exit(0)
-
-    output_dir = Path(output_str)
-
-    # Confirm
-    console.print()
-    console.print("[bold]Configuration:[/bold]")
-    console.print(f"  API URL: {base_url}")
-    console.print(f"  Room ID: {room_id}")
-    console.print(f"  Output:  {output_dir}")
-    console.print()
-
-    confirm = questionary.confirm(
-        "Proceed with mapping?",
-        default=True,
-    ).ask()
-
-    if not confirm:
-        console.print("[yellow]Cancelled[/yellow]")
-        raise typer.Exit(0)
-
-    console.print()
-
-    # Run the mapping
-    asyncio.run(run_map(room_id, token, base_url, output_dir, auto_open=False))
-
-    # Prompt to open dashboard
-    open_now = questionary.confirm(
-        "Open dashboard in browser?",
-        default=True,
-    ).ask()
-
-    if open_now:
-        dashboard_path = output_dir / "solution.html"
-        if open_in_browser(dashboard_path):
-            console.print("[green]Dashboard opened![/green]")
-        else:
-            msg = f"[yellow]Couldn't open automatically. Open manually:[/yellow] {dashboard_path}"
-            console.print(msg)
+    return pat, container
 
 
 @app.command()
@@ -466,12 +418,6 @@ def map(
         "-o",
         help="Output directory for generated files (default: ./output)",
     ),
-    interactive: bool = typer.Option(
-        False,
-        "--interactive",
-        "-i",
-        help="Run in interactive mode with prompts",
-    ),
     no_open: bool = typer.Option(
         False,
         "--no-open",
@@ -486,7 +432,9 @@ def map(
 ) -> None:
     """Map a Veoci solution and generate visualizations.
 
-    Quick start (non-interactive):
+    Default: Wizard mode (prompts for PAT and container).
+
+    Scripting mode (provide both flags to skip wizard):
         veoci-map --pat YOUR_TOKEN --container CONTAINER_ID
 
     The tool will fetch solution data, analyze relationships, and generate:
@@ -508,21 +456,15 @@ def map(
     final_container = container or room_id
     final_token = pat or token
 
-    # Interactive mode (explicit flag or missing required params)
-    if interactive or (not final_container and not final_token):
-        run_interactive()
+    # If both provided, run directly (scripting mode)
+    if final_token and final_container:
+        asyncio.run(run_map(final_container, final_token, base_url, output, auto_open=not no_open))
         return
 
-    # Non-interactive mode requires both container and token
-    if not final_container:
-        console.print("[bold red]Error:[/bold red] --container is required (or use --interactive)")
-        raise typer.Exit(1)
-
-    if not final_token:
-        console.print("[bold red]Error:[/bold red] No token provided. Use --pat or set VEOCI_TOKEN")
-        raise typer.Exit(1)
-
-    asyncio.run(run_map(final_container, final_token, base_url, output, auto_open=not no_open))
+    # Otherwise, wizard mode
+    final_token, final_container = run_wizard()
+    console.print()  # Spacing before mapping output
+    asyncio.run(run_map(final_container, final_token, base_url, output, auto_open=True))
 
 
 def main() -> None:
