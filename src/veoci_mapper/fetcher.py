@@ -181,6 +181,46 @@ async def fetch_external_forms(
     return external_forms
 
 
+async def fetch_external_workflows(
+    client: VeociClient,
+    workflow_ids: set[str],
+    existing_workflow_ids: set[str],
+    container_id: str,
+    max_concurrent: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Fetch workflows that are referenced but not in the main container.
+
+    Returns workflows with an 'external' flag set to True.
+    """
+    missing_ids = workflow_ids - existing_workflow_ids
+
+    if not missing_ids:
+        return []
+
+    console.print(f"[dim]Fetching {len(missing_ids)} external workflows...[/dim]")
+
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def fetch_one(workflow_id: str) -> dict[str, Any] | None:
+        async with semaphore:
+            try:
+                workflow = await client.get(f"/workflows/{workflow_id}", params={"c": container_id})
+                workflow['external'] = True  # Mark as external
+                return workflow
+            except Exception as e:
+                logger.warning(f"Could not fetch external workflow {workflow_id}: {e}")
+                return None
+
+    tasks = [fetch_one(wid) for wid in missing_ids]
+    results = await asyncio.gather(*tasks)
+
+    external_workflows = [w for w in results if w is not None]
+    console.print(f"[green]Fetched {len(external_workflows)} external workflows[/green]")
+
+    return external_workflows
+
+
 async def fetch_external_task_types(
     client: VeociClient,
     task_type_refs: set[tuple[str, str]],
