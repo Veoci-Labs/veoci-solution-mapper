@@ -7,10 +7,11 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 block_cipher = None
 
 # Collect all submodules for packages that use dynamic imports
-hiddenimports = [
+hiddenimports = collect_submodules('questionary') + collect_submodules('prompt_toolkit') + [
     # veoci_mapper package
     'veoci_mapper',
     'veoci_mapper.config',
+    'veoci_mapper.version',
     'veoci_mapper.cli',
     'veoci_mapper.client',
     'veoci_mapper.analyzer',
@@ -25,9 +26,11 @@ hiddenimports = [
     # Dependencies that may have hidden imports
     'google.genai',
     'google.ai.generativelanguage',
-    'questionary',
     'networkx',
     'markdown',
+    'typer',
+    'click',
+    'rich',
 ]
 
 # Collect package data files if any
