@@ -334,6 +334,7 @@ def run_wizard() -> tuple[str, str]:
         if use_saved:
             pat = saved_pat
         else:
+            console.print("To get your PAT, visit: [cyan]https://veoci.com/v/me/settings/advanced[/cyan]")
             new_pat = questionary.password("Enter your PAT:").ask()
             if new_pat is None:
                 raise typer.Exit(0)
@@ -343,6 +344,7 @@ def run_wizard() -> tuple[str, str]:
             save_pat(new_pat)
             pat = new_pat
     else:
+        console.print("To get your PAT, visit: [cyan]https://veoci.com/v/me/settings/advanced[/cyan]")
         new_pat = questionary.password("Enter your Veoci PAT:").ask()
         if new_pat is None:
             raise typer.Exit(0)
