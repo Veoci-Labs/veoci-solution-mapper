@@ -298,6 +298,27 @@ async def fetch_object_actions(
     return await client.get(f"/objects/{object_id}/actions")
 
 
+async def fetch_task_type_actions(
+    client: VeociClient,
+    task_type_id: str,
+    container_id: str,
+) -> list[dict[str, Any]]:
+    """
+    Fetch custom actions for a task type.
+
+    Task types use a different endpoint than forms/workflows:
+    /actions?object={id}&container={container_id}
+    """
+    try:
+        return await client.get(
+            "/actions",
+            params={"object": task_type_id, "container": container_id}
+        )
+    except Exception as e:
+        logger.warning(f"Failed to fetch actions for task type {task_type_id}: {e}")
+        return []
+
+
 async def fetch_action_builder(
     client: VeociClient,
     action_id: str,
@@ -313,22 +334,30 @@ async def fetch_action_builder(
 async def fetch_all_object_actions(
     client: VeociClient,
     object_ids: list[str],
+    task_type_refs: list[tuple[str, str, str]] | None = None,
     max_concurrent: int = 5,
 ) -> dict[str, list[dict[str, Any]]]:
     """
     Fetch actions for multiple objects in parallel.
 
     Two-phase fetch:
-    1. Get basic action list from /objects/{id}/actions
+    1. Get basic action list from /objects/{id}/actions (forms/workflows)
+       or /actions?object={id}&container={cid} (task types)
     2. For mappable actions, fetch full config from /actions/{id}/builder
 
-    Returns dict mapping object_id -> list of actions.
+    Args:
+        object_ids: List of form/workflow IDs
+        task_type_refs: Optional list of (task_type_id, categoryId, container_id) tuples
+        max_concurrent: Max concurrent requests
+
+    Returns dict mapping object_id/categoryId -> list of actions.
     Uses semaphore to limit concurrent requests.
     """
     semaphore = asyncio.Semaphore(max_concurrent)
 
     # Phase 1: Fetch basic action lists
-    async def fetch_with_semaphore(object_id: str) -> tuple[str, list[dict[str, Any]]]:
+    # Forms/workflows use /objects/{id}/actions
+    async def fetch_object_with_semaphore(object_id: str) -> tuple[str, list[dict[str, Any]]]:
         async with semaphore:
             try:
                 actions = await fetch_object_actions(client, object_id)
@@ -339,9 +368,27 @@ async def fetch_all_object_actions(
                     f"{e}[/yellow]"
                 )
                 console.print(msg)
-                return (object_id, [])  # Return empty list if fetch fails
+                return (object_id, [])
 
-    tasks = [fetch_with_semaphore(obj_id) for obj_id in object_ids]
+    # Task types use /actions?object={id}&container={cid}
+    # Key by categoryId for analyzer lookup
+    async def fetch_task_type_with_semaphore(
+        task_type_id: str,
+        category_id: str,
+        container_id: str
+    ) -> tuple[str, list[dict[str, Any]]]:
+        async with semaphore:
+            actions = await fetch_task_type_actions(client, task_type_id, container_id)
+            return (category_id, actions)  # Key by categoryId, not task_type id
+
+    tasks = [fetch_object_with_semaphore(obj_id) for obj_id in object_ids]
+
+    if task_type_refs:
+        tasks.extend([
+            fetch_task_type_with_semaphore(tt_id, cat_id, c_id)
+            for tt_id, cat_id, c_id in task_type_refs
+        ])
+
     results = await asyncio.gather(*tasks)
     actions_by_object = dict(results)
 
@@ -459,21 +506,34 @@ async def fetch_solution(
     # 5. Fetch custom actions for all forms, workflows, and task types
     form_ids = [str(f.get("id") or f.get("formId")) for f in forms]
     workflow_ids = [str(w.get("id")) for w in workflows if w.get("id")]
-    task_type_ids = [str(tt.get("categoryId")) for tt in task_types_list if tt.get("categoryId")]
-    all_object_ids = form_ids + workflow_ids + task_type_ids
+
+    # Build task type refs: (id, categoryId, container_id)
+    # id is used for API call, categoryId is used as dict key
+    task_type_refs = [
+        (str(tt.get("id")), str(tt.get("categoryId")), container_id)
+        for tt in task_types_list
+        if tt.get("id") and tt.get("categoryId")
+    ]
+    task_type_category_ids = [cat_id for _, cat_id, _ in task_type_refs]
+
+    all_object_ids = form_ids + workflow_ids
 
     msg = (
-        f"[dim]Fetching actions for {len(all_object_ids)} objects "
+        f"[dim]Fetching actions for {len(all_object_ids) + len(task_type_refs)} objects "
         f"({len(form_ids)} forms, {len(workflow_ids)} workflows, "
-        f"{len(task_type_ids)} task types)...[/dim]"
+        f"{len(task_type_refs)} task types)...[/dim]"
     )
     console.print(msg)
-    actions = await fetch_all_object_actions(client, all_object_ids)
+    actions = await fetch_all_object_actions(
+        client,
+        all_object_ids,
+        task_type_refs=task_type_refs
+    )
 
     # Count actions by type for logging
     form_action_count = sum(len(actions.get(fid, [])) for fid in form_ids)
     workflow_action_count = sum(len(actions.get(wid, [])) for wid in workflow_ids)
-    task_type_action_count = sum(len(actions.get(ttid, [])) for ttid in task_type_ids)
+    task_type_action_count = sum(len(actions.get(cat_id, [])) for cat_id in task_type_category_ids)
     console.print(
         f"[green]Fetched {form_action_count} form actions, "
         f"{workflow_action_count} workflow actions, "
