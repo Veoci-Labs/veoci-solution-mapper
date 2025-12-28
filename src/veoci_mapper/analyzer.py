@@ -73,12 +73,12 @@ def extract_relationships(
                 target_name = source_form.get("name") if source_form else None
 
                 # Extract is_subform for REFERENCE fields
+                # Subforms require explicit referenceNewEntry=true
+                # Absence or false means it's a regular Reference field
                 is_subform = None
                 if field_type == REFERENCE:
                     reference_new_entry = field.get("properties", {}).get("referenceNewEntry")
-                    is_subform = (
-                        bool(reference_new_entry) if reference_new_entry is not None else None
-                    )
+                    is_subform = bool(reference_new_entry)
 
                 relationships.append(
                     Relationship(
