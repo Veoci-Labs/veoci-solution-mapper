@@ -33,8 +33,8 @@ def inject_key():
     )
 
     config_path.write_text(new_content)
-    print(f"✓ Injecting API key into {config_path}")
-    print(f"✓ Updated {config_path}")
+    print(f"[OK] Injecting API key into {config_path}")
+    print(f"[OK] Updated {config_path}")
 
 
 if __name__ == '__main__':
