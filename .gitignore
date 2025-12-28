@@ -39,7 +39,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Output directories
-output/
-results/
-test-output/
+# Output directories (root level only)
+/output/
+/results/
+/test-output/
