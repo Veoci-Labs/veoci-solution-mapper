@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 from pathlib import Path
 
 import questionary
@@ -14,6 +13,7 @@ from rich.panel import Panel
 
 from veoci_mapper.analyzer import analyze_solution, get_referenced_ids, get_referenced_workflow_ids
 from veoci_mapper.client import AuthenticationError, VeociClient
+from veoci_mapper.credentials import get_saved_pat, mask_pat, save_pat
 from veoci_mapper.fetcher import (
     fetch_all_task_type_definitions,
     fetch_external_forms,
@@ -31,6 +31,7 @@ from veoci_mapper.output import (
     generate_markdown_summary,
     open_in_browser,
 )
+from veoci_mapper.version import __version__, check_for_update, get_download_url
 
 load_dotenv()
 
@@ -39,6 +40,13 @@ app = typer.Typer(
     help="Map Veoci solution relationships and visualize form connections.",
 )
 console = Console()
+
+
+def version_callback(value: bool) -> None:
+    """Print version and exit."""
+    if value:
+        typer.echo(f"veoci-map version {__version__}")
+        raise typer.Exit()
 
 
 def configure_logging(debug: bool = False) -> None:
@@ -79,10 +87,7 @@ async def run_map(
                 )
                 # Extract container ID from each task type, or fall back to room_id
                 task_type_refs = [
-                    (
-                        str(tt.get("categoryId")),
-                        str(tt.get("container", {}).get("id", room_id))
-                    )
+                    (str(tt.get("categoryId")), str(tt.get("container", {}).get("id", room_id)))
                     for tt in task_types_list
                 ]
                 solution_task_types_dict = await fetch_all_task_type_definitions(
@@ -91,8 +96,7 @@ async def run_map(
                 )
                 solution_task_types = list(solution_task_types_dict.values())
                 console.print(
-                    f"[green]Fetched {len(solution_task_types)} "
-                    "task type definitions[/green]"
+                    f"[green]Fetched {len(solution_task_types)} task type definitions[/green]"
                 )
             else:
                 solution_task_types = []
@@ -166,8 +170,7 @@ async def run_map(
 
                 # Merge unique relationships
                 existing_rel_keys = {
-                    (r.source_id, r.target_id, r.field_name, r.action_id)
-                    for r in relationships
+                    (r.source_id, r.target_id, r.field_name, r.action_id) for r in relationships
                 }
                 added_count = 0
                 for rel in task_type_relationships:
@@ -214,12 +217,10 @@ async def run_map(
 
             # Build node type breakdown
             node_types = [f"{stats['form_count']} forms", f"{stats['workflow_count']} workflows"]
-            if stats.get('task_type_count', 0) > 0:
+            if stats.get("task_type_count", 0) > 0:
                 node_types.append(f"{stats['task_type_count']} task types")
 
-            console.print(
-                f"  Nodes: {stats['total_nodes']} ({', '.join(node_types)})"
-            )
+            console.print(f"  Nodes: {stats['total_nodes']} ({', '.join(node_types)})")
 
             # Count external nodes
             external_form_count = sum(1 for f in all_forms if f.get("external", False))
@@ -315,119 +316,96 @@ async def run_map(
         raise typer.Exit(1)
 
 
-def run_interactive() -> None:
-    """Run interactive wizard mode."""
+def run_wizard() -> tuple[str, str]:
+    """Run streamlined wizard mode, return (pat, container_id)."""
 
-    console.print(
-        Panel.fit(
-            "[bold]Veoci Solution Mapper[/bold]\nMap forms, workflows, and their relationships",
-            border_style="blue",
-        )
-    )
-    console.print()
+    console.print("\n[bold]Welcome to Veoci Solution Mapper[/bold]\n")
 
-    # Get base URL
-    base_url = questionary.text(
-        "Veoci API URL:",
-        default=os.getenv("VEOCI_BASE_URL", "https://veoci.com"),
-    ).ask()
-
-    if base_url is None:  # User cancelled
-        raise typer.Exit(0)
-
-    # Get token (check env first)
-    env_token = os.getenv("VEOCI_TOKEN")
-    if env_token:
-        use_env = questionary.confirm(
-            "Use token from VEOCI_TOKEN environment variable?",
+    # PAT
+    saved_pat = get_saved_pat()
+    if saved_pat:
+        use_saved = questionary.confirm(
+            f"Use saved PAT ({mask_pat(saved_pat)})?",
             default=True,
         ).ask()
-        if use_env is None:
+        if use_saved is None:
             raise typer.Exit(0)
-        token = env_token if use_env else None
+
+        if use_saved:
+            pat = saved_pat
+        else:
+            console.print("To get your PAT, visit: [cyan]https://veoci.com/v/me/settings/advanced[/cyan]")
+            new_pat = questionary.password("Enter your PAT:").ask()
+            if new_pat is None:
+                raise typer.Exit(0)
+            if not new_pat:
+                console.print("[red]PAT is required[/red]")
+                raise typer.Exit(1)
+            save_pat(new_pat)
+            pat = new_pat
     else:
-        token = None
-
-    if not token:
-        token = questionary.password(
-            "Personal Access Token (PAT):",
-        ).ask()
-
-        if not token:
-            console.print("[red]Token is required[/red]")
+        console.print("To get your PAT, visit: [cyan]https://veoci.com/v/me/settings/advanced[/cyan]")
+        new_pat = questionary.password("Enter your Veoci PAT:").ask()
+        if new_pat is None:
+            raise typer.Exit(0)
+        if not new_pat:
+            console.print("[red]PAT is required[/red]")
             raise typer.Exit(1)
 
-    # Get room ID
-    room_id = questionary.text(
-        "Room ID to map:",
-        validate=lambda x: len(x) > 0 or "Room ID is required",
+        if questionary.confirm("Save PAT for future use?", default=True).ask():
+            save_pat(new_pat)
+
+        pat = new_pat
+
+    # Container
+    container = questionary.text(
+        "Enter container ID to map:",
+        validate=lambda x: len(x) > 0 or "Container ID is required",
     ).ask()
 
-    if room_id is None:
+    if container is None:
         raise typer.Exit(0)
 
-    # Get output directory
-    output_str = questionary.text(
-        "Output directory:",
-        default="./output",
-    ).ask()
-
-    if output_str is None:
-        raise typer.Exit(0)
-
-    output_dir = Path(output_str)
-
-    # Confirm
-    console.print()
-    console.print("[bold]Configuration:[/bold]")
-    console.print(f"  API URL: {base_url}")
-    console.print(f"  Room ID: {room_id}")
-    console.print(f"  Output:  {output_dir}")
-    console.print()
-
-    confirm = questionary.confirm(
-        "Proceed with mapping?",
-        default=True,
-    ).ask()
-
-    if not confirm:
-        console.print("[yellow]Cancelled[/yellow]")
-        raise typer.Exit(0)
-
-    console.print()
-
-    # Run the mapping
-    asyncio.run(run_map(room_id, token, base_url, output_dir, auto_open=False))
-
-    # Prompt to open dashboard
-    open_now = questionary.confirm(
-        "Open dashboard in browser?",
-        default=True,
-    ).ask()
-
-    if open_now:
-        dashboard_path = output_dir / "solution.html"
-        if open_in_browser(dashboard_path):
-            console.print("[green]Dashboard opened![/green]")
-        else:
-            msg = f"[yellow]Couldn't open automatically. Open manually:[/yellow] {dashboard_path}"
-            console.print(msg)
+    return pat, container
 
 
 @app.command()
 def map(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    ),
+    container: str = typer.Option(
+        None,
+        "--container",
+        "-c",
+        help="Veoci container ID (room) to map",
+    ),
+    pat: str = typer.Option(
+        None,
+        "--pat",
+        "-p",
+        envvar="VEOCI_TOKEN",
+        help="Personal Access Token (or set VEOCI_TOKEN env var)",
+    ),
+    # Hidden legacy aliases for backward compatibility
     room_id: str = typer.Option(
         None,
         "--room-id",
         "-r",
-        help="The Veoci room ID to map",
+        help="(deprecated: use --container)",
+        hidden=True,
     ),
     token: str = typer.Option(
         None,
         "--token",
         "-t",
-        envvar="VEOCI_TOKEN",
-        help="Veoci Personal Access Token (or set VEOCI_TOKEN env var)",
+        help="(deprecated: use --pat)",
+        hidden=True,
     ),
     base_url: str = typer.Option(
         "https://veoci.com",
@@ -440,13 +418,7 @@ def map(
         Path("./output"),
         "--output",
         "-o",
-        help="Output directory for generated files",
-    ),
-    interactive: bool = typer.Option(
-        False,
-        "--interactive",
-        "-i",
-        help="Run in interactive mode with prompts",
+        help="Output directory for generated files (default: ./output)",
     ),
     no_open: bool = typer.Option(
         False,
@@ -460,28 +432,41 @@ def map(
         help="Enable debug logging (shows HTTP requests, etc.)",
     ),
 ) -> None:
-    """Map a Veoci solution and generate visualizations."""
+    """Map a Veoci solution and generate visualizations.
+
+    Default: Wizard mode (prompts for PAT and container).
+
+    Scripting mode (provide both flags to skip wizard):
+        veoci-map --pat YOUR_TOKEN --container CONTAINER_ID
+
+    The tool will fetch solution data, analyze relationships, and generate:
+      - Interactive HTML dashboard (auto-opens in browser)
+      - JSON export
+      - Mermaid diagram
+      - Markdown summary
+    """
 
     # Configure logging based on debug flag
     configure_logging(debug)
 
-    # Interactive mode
-    if interactive:
-        run_interactive()
+    # Check for updates (non-blocking)
+    new_version = check_for_update()
+    if new_version:
+        typer.echo(f"[Update available: v{new_version}] {get_download_url()}", err=True)
+
+    # Resolve legacy aliases (prioritize new flags)
+    final_container = container or room_id
+    final_token = pat or token
+
+    # If both provided, run directly (scripting mode)
+    if final_token and final_container:
+        asyncio.run(run_map(final_container, final_token, base_url, output, auto_open=not no_open))
         return
 
-    # Non-interactive mode requires room_id
-    if not room_id:
-        console.print("[bold red]Error:[/bold red] --room-id is required (or use --interactive)")
-        raise typer.Exit(1)
-
-    if not token:
-        console.print(
-            "[bold red]Error:[/bold red] No token provided. Use --token or set VEOCI_TOKEN"
-        )
-        raise typer.Exit(1)
-
-    asyncio.run(run_map(room_id, token, base_url, output, auto_open=not no_open))
+    # Otherwise, wizard mode
+    final_token, final_container = run_wizard()
+    console.print()  # Spacing before mapping output
+    asyncio.run(run_map(final_container, final_token, base_url, output, auto_open=True))
 
 
 def main() -> None:
