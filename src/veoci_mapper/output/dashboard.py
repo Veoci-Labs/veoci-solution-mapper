@@ -64,6 +64,7 @@ def generate_dashboard_html(
     stats: dict[str, Any],
     graph: nx.DiGraph,
     markdown_summary: str,
+    base_url: str,
 ) -> str:
     """Generate unified HTML dashboard with tabs."""
 
@@ -73,6 +74,7 @@ def generate_dashboard_html(
         node_type = data.get("node_type", "form")
         is_external = data.get("external", False)
         name = data.get("name", node_id)
+        container_id = data.get("container_id")
 
         # Color: orange for external forms, blue for local forms, purple for workflows, teal for task types
         if node_type == "form":
@@ -104,6 +106,8 @@ def generate_dashboard_html(
             "shape": shape,
             "size": size,
             "font": font_config,
+            "node_type": node_type,
+            "container_id": container_id,
         }
 
         nodes_data.append(node_def)
@@ -320,7 +324,8 @@ def generate_dashboard_html(
             border-bottom: 1px solid #e0e0e0;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            gap: 12px;
             background: #f8f9fa;
         }}
         .panel-header h3 {{
@@ -329,13 +334,27 @@ def generate_dashboard_html(
             font-weight: 600;
             color: #1a237e;
         }}
+        .panel-title-text {{
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a237e;
+            line-height: 1.3;
+        }}
+        .panel-header-actions {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }}
         .panel-close {{
             background: none;
             border: none;
-            font-size: 20px;
+            font-size: 24px;
             cursor: pointer;
             color: #666;
-            padding: 0 5px;
+            padding: 0;
+            line-height: 1;
         }}
         .panel-close:hover {{
             color: #333;
@@ -479,6 +498,24 @@ def generate_dashboard_html(
             border-radius: 3px;
             flex-shrink: 0;
         }}
+        .legend-color.circle {{
+            border-radius: 50%;
+        }}
+        .legend-color.square {{
+            border-radius: 2px;
+        }}
+        .legend-color.diamond {{
+            width: 10px;
+            height: 10px;
+            transform: rotate(45deg);
+            margin: 2px;
+        }}
+        .legend-item-highlight {{
+            display: none;
+        }}
+        .legend-item-highlight.visible {{
+            display: flex;
+        }}
         .table-toolbar {{
             padding: 12px 20px;
             background: white;
@@ -594,7 +631,8 @@ def generate_dashboard_html(
         .detail-header {{
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            gap: 12px;
             padding: 20px 25px 15px 25px;
             border-bottom: 2px solid #e8eaf6;
             flex-shrink: 0;
@@ -604,6 +642,19 @@ def generate_dashboard_html(
             font-size: 18px;
             margin: 0;
         }}
+        .detail-title-text {{
+            flex: 1;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a237e;
+            line-height: 1.3;
+        }}
+        .detail-header-actions {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }}
         .close-btn {{
             background: none;
             border: none;
@@ -611,10 +662,7 @@ def generate_dashboard_html(
             color: #999;
             cursor: pointer;
             padding: 0;
-            width: 30px;
-            height: 30px;
-            line-height: 30px;
-            text-align: center;
+            line-height: 1;
         }}
         .close-btn:hover {{
             color: #333;
@@ -750,6 +798,38 @@ def generate_dashboard_html(
         .markdown-container strong {{
             color: #1a237e;
         }}
+        .veoci-link-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: #2e7d32;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }}
+        .veoci-link-btn:hover {{
+            background: #1b5e20;
+        }}
+        .ref-item-veoci-link {{
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 8px;
+            font-size: 11px;
+            color: #1976d2;
+            text-decoration: none;
+            border: 1px solid #1976d2;
+            border-radius: 4px;
+            transition: background-color 0.15s;
+        }}
+        .ref-item-veoci-link:hover {{
+            background-color: #e3f2fd;
+            text-decoration: none;
+        }}
     </style>
 </head>
 <body>
@@ -780,10 +860,7 @@ def generate_dashboard_html(
         </div>
         <div class="graph-container">
             <div id="graph-panel" class="graph-panel">
-                <div class="panel-header">
-                    <h3 id="panel-title">Select a node</h3>
-                    <button onclick="closePanel()" class="panel-close">×</button>
-                </div>
+                <div class="panel-header"></div>
                 <div class="panel-body">
                     <div class="panel-section">
                         <h4>References (Outgoing)</h4>
@@ -798,13 +875,13 @@ def generate_dashboard_html(
             <div id="graph"></div>
             <div class="graph-legend">
                 <div class="legend-title">Nodes</div>
-                <div class="legend-item"><span class="legend-color" style="background:#4fc3f7"></span> Local Form</div>
-                <div class="legend-item"><span class="legend-color" style="background:#ff9800"></span> External Form</div>
-                <div class="legend-item"><span class="legend-color" style="background:#ba68c8"></span> Workflow</div>
-                <div class="legend-item"><span class="legend-color" style="background:#26a69a"></span> Local Task Type</div>
-                <div class="legend-item"><span class="legend-color" style="background:#80cbc4"></span> External Task Type</div>
-                <div class="legend-item"><span class="legend-color" style="background:#ff6b6b"></span> Selected</div>
-                <div class="legend-item"><span class="legend-color" style="background:#ffd93d"></span> Connected</div>
+                <div class="legend-item"><span class="legend-color circle" style="background:#4fc3f7"></span> Local Form</div>
+                <div class="legend-item"><span class="legend-color circle" style="background:#ff9800"></span> External Form</div>
+                <div class="legend-item"><span class="legend-color square" style="background:#ba68c8"></span> Workflow</div>
+                <div class="legend-item"><span class="legend-color diamond" style="background:#26a69a"></span> Local Task Type</div>
+                <div class="legend-item"><span class="legend-color diamond" style="background:#80cbc4"></span> External Task Type</div>
+                <div class="legend-item legend-item-highlight" id="legend-selected"><span class="legend-color circle" style="background:#ff6b6b"></span> Selected</div>
+                <div class="legend-item legend-item-highlight" id="legend-connected"><span class="legend-color circle" style="background:#ffd93d"></span> Connected</div>
                 <div class="legend-title" style="margin-top:12px">Relationships</div>
                 <div class="legend-item"><span style="width:20px;height:2px;background:#2196f3;display:inline-block"></span> Field Reference</div>
                 <div class="legend-item"><span style="width:20px;height:2px;background:#ff9800;display:inline-block;background-image:linear-gradient(90deg,#ff9800 50%,transparent 50%);background-size:8px 2px"></span> Custom Action</div>
@@ -823,10 +900,7 @@ def generate_dashboard_html(
         <!-- Detail panel overlay and modal -->
         <div class="detail-overlay" id="detail-overlay" onclick="closeDetails()"></div>
         <div class="detail-panel" id="detail-panel">
-            <div class="detail-header">
-                <h2 id="detail-title">Details</h2>
-                <button class="close-btn" onclick="closeDetails()">×</button>
-            </div>
+            <div class="detail-header"></div>
             <div class="detail-panel-body">
                 <div class="detail-section">
                     <h3>References (Outgoing)</h3>
@@ -905,11 +979,25 @@ def generate_dashboard_html(
         }}
 
         // Store edges and nodes data for detail panel and search
+        const baseUrl = '{base_url}';
         const edgesData = {json.dumps(edges_data)};
         const nodesData = {json.dumps(nodes_data)}.map(n => ({{
             ...n,
             originalColor: n.color
         }}));
+
+        // Build Veoci URL for a node
+        function getVeociUrl(nodeId) {{
+            const node = nodesData.find(n => n.id === nodeId);
+            if (!node || !node.container_id) return null;
+
+            const patterns = {{
+                'form': `${{baseUrl}}/v/c/${{node.container_id}}/form/${{nodeId}}`,
+                'workflow': `${{baseUrl}}/v/c/${{node.container_id}}/workflow/${{nodeId}}`,
+                'task_type': `${{baseUrl}}/v/c/${{node.container_id}}/taskType/${{nodeId}}/tasks`
+            }};
+            return patterns[node.node_type] || null;
+        }}
 
         // Initialize graph
         const nodes = new vis.DataSet(nodesData);
@@ -1008,6 +1096,9 @@ def generate_dashboard_html(
 
             nodes.update(updates);
 
+            // Show legend highlight items
+            showLegendHighlights();
+
             // Focus on first matching node
             if (matchingNodes.length > 0) {{
                 network.focus(matchingNodes[0], {{
@@ -1025,6 +1116,9 @@ def generate_dashboard_html(
                 font: {{ size: 14, color: '#343434' }}
             }}));
             nodes.update(updates);
+
+            // Hide legend highlight items
+            hideLegendHighlights();
         }}
 
         // Full reset including input clear (called from Reset button)
@@ -1063,6 +1157,9 @@ def generate_dashboard_html(
             }});
 
             nodes.update(updates);
+
+            // Show legend highlight items
+            showLegendHighlights();
         }}
 
         // Focus on a node, highlight it and its connections, then show panel
@@ -1088,7 +1185,20 @@ def generate_dashboard_html(
             const node = nodesData.find(n => n.id === nodeId);
             if (!node) return;
 
-            document.getElementById('panel-title').textContent = node.label;
+            const veociUrl = getVeociUrl(nodeId);
+            const linkBtn = veociUrl ? `<a href="${{veociUrl}}" target="_blank" class="veoci-link-btn">Open in Veoci ↗</a>` : '';
+
+            // Restructure header with title on one line, button below
+            const panelHeader = document.querySelector('#graph-panel .panel-header');
+            panelHeader.innerHTML = `
+                <div style="width: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${{linkBtn ? '8px' : '0'}};">
+                        <span class="panel-title-text">${{node.title || node.label}}</span>
+                        <button class="panel-close" onclick="closePanel()">×</button>
+                    </div>
+                    ${{linkBtn ? linkBtn : ''}}
+                </div>
+            `;
 
             // Get outgoing references
             const outgoing = edgesData.filter(e => e.from === nodeId);
@@ -1107,12 +1217,15 @@ def generate_dashboard_html(
                     html += '<div class="panel-subsection actions"><h5>Custom Actions</h5>';
                     html += actions.map(e => {{
                         const target = nodesData.find(n => n.id === e.to);
+                        const targetUrl = getVeociUrl(e.to);
+                        const targetLink = targetUrl ? `<a href="${{targetUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         return `<li class="panel-ref-item" onclick="focusNode('${{e.to}}')">
                             <div class="panel-ref-name">${{e.action_name || target?.label || e.to}}<span class="badge action">ACTION</span></div>
                             <div class="panel-ref-meta">
                                 <div>Trigger: ${{formatTriggerType(e.trigger_type)}}</div>
                                 <div>Automatic: ${{e.automatic ? 'Yes' : 'No'}}</div>
                             </div>
+                            ${{targetLink}}
                         </li>`;
                     }}).join('');
                     html += '</div>';
@@ -1123,12 +1236,15 @@ def generate_dashboard_html(
                     html += '<div class="panel-subsection fields"><h5>Field References</h5>';
                     html += fields.map(e => {{
                         const target = nodesData.find(n => n.id === e.to);
+                        const targetUrl = getVeociUrl(e.to);
+                        const targetLink = targetUrl ? `<a href="${{targetUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         return `<li class="panel-ref-item" onclick="focusNode('${{e.to}}')">
                             <div class="panel-ref-name">${{target ? target.label : e.to}}</div>
                             <div class="panel-ref-meta">
                                 <div>Type: ${{getReadableType(e)}}</div>
                                 <div>Field: ${{e.field_name || 'N/A'}}</div>
                             </div>
+                            ${{targetLink}}
                         </li>`;
                     }}).join('');
                     html += '</div>';
@@ -1154,12 +1270,15 @@ def generate_dashboard_html(
                     html += '<div class="panel-subsection actions"><h5>Custom Actions</h5>';
                     html += actions.map(e => {{
                         const source = nodesData.find(n => n.id === e.from);
+                        const sourceUrl = getVeociUrl(e.from);
+                        const sourceLink = sourceUrl ? `<a href="${{sourceUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         return `<li class="panel-ref-item" onclick="focusNode('${{e.from}}')">
                             <div class="panel-ref-name">${{e.action_name || source?.label || e.from}}<span class="badge action">ACTION</span></div>
                             <div class="panel-ref-meta">
                                 <div>Trigger: ${{formatTriggerType(e.trigger_type)}}</div>
                                 <div>Automatic: ${{e.automatic ? 'Yes' : 'No'}}</div>
                             </div>
+                            ${{sourceLink}}
                         </li>`;
                     }}).join('');
                     html += '</div>';
@@ -1170,12 +1289,15 @@ def generate_dashboard_html(
                     html += '<div class="panel-subsection fields"><h5>Field References</h5>';
                     html += fields.map(e => {{
                         const source = nodesData.find(n => n.id === e.from);
+                        const sourceUrl = getVeociUrl(e.from);
+                        const sourceLink = sourceUrl ? `<a href="${{sourceUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         return `<li class="panel-ref-item" onclick="focusNode('${{e.from}}')">
                             <div class="panel-ref-name">${{source ? source.label : e.from}}</div>
                             <div class="panel-ref-meta">
                                 <div>Type: ${{getReadableType(e)}}</div>
                                 <div>Field: ${{e.field_name || 'N/A'}}</div>
                             </div>
+                            ${{sourceLink}}
                         </li>`;
                     }}).join('');
                     html += '</div>';
@@ -1185,6 +1307,18 @@ def generate_dashboard_html(
             }}
 
             document.getElementById('graph-panel').classList.add('active');
+        }}
+
+        // Show legend highlight items (Selected and Connected)
+        function showLegendHighlights() {{
+            document.getElementById('legend-selected').classList.add('visible');
+            document.getElementById('legend-connected').classList.add('visible');
+        }}
+
+        // Hide legend highlight items
+        function hideLegendHighlights() {{
+            document.getElementById('legend-selected').classList.remove('visible');
+            document.getElementById('legend-connected').classList.remove('visible');
         }}
 
         // Close graph panel
@@ -1330,8 +1464,21 @@ def generate_dashboard_html(
             const node = nodesData.find(n => n.id === nodeId);
             if (!node) return;
 
-            // Update title
-            document.getElementById('detail-title').textContent = node.label;
+            // Update title with button below
+            const veociUrl = getVeociUrl(nodeId);
+            const linkBtn = veociUrl ? `<a href="${{veociUrl}}" target="_blank" class="veoci-link-btn">Open in Veoci ↗</a>` : '';
+
+            // Restructure header with title on one line, button below
+            const detailHeader = document.querySelector('#detail-panel .detail-header');
+            detailHeader.innerHTML = `
+                <div style="width: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: ${{linkBtn ? '8px' : '0'}};">
+                        <span class="detail-title-text">${{node.title || node.label}}</span>
+                        <button class="close-btn" onclick="closeDetails()">×</button>
+                    </div>
+                    ${{linkBtn ? linkBtn : ''}}
+                </div>
+            `;
 
             // Find outgoing edges (references)
             const outgoing = edgesData.filter(e => e.from === nodeId);
@@ -1365,6 +1512,8 @@ def generate_dashboard_html(
 
                     actions.forEach(edge => {{
                         const targetNode = nodesData.find(n => n.id === edge.to);
+                        const targetUrl = getVeociUrl(edge.to);
+                        const targetLink = targetUrl ? `<a href="${{targetUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         const li = document.createElement('li');
                         li.className = 'ref-item';
 
@@ -1375,6 +1524,7 @@ def generate_dashboard_html(
                                 <div><strong>Trigger:</strong> ${{formatTriggerType(edge.trigger_type)}}</div>
                                 <div><strong>Automatic:</strong> ${{edge.automatic ? 'Yes' : 'No'}}</div>
                             </div>
+                            ${{targetLink}}
                         `;
                         wrapper.appendChild(li);
                     }});
@@ -1400,6 +1550,8 @@ def generate_dashboard_html(
 
                     fields.forEach(edge => {{
                         const targetNode = nodesData.find(n => n.id === edge.to);
+                        const targetUrl = getVeociUrl(edge.to);
+                        const targetLink = targetUrl ? `<a href="${{targetUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         const li = document.createElement('li');
                         li.className = 'ref-item';
 
@@ -1409,6 +1561,7 @@ def generate_dashboard_html(
                                 <div><strong>Type:</strong> ${{getReadableType(edge)}}</div>
                                 <div><strong>Field:</strong> ${{edge.field_name || 'N/A'}}</div>
                             </div>
+                            ${{targetLink}}
                         `;
                         fieldWrapper.appendChild(li);
                     }});
@@ -1447,6 +1600,8 @@ def generate_dashboard_html(
 
                     actions.forEach(edge => {{
                         const sourceNode = nodesData.find(n => n.id === edge.from);
+                        const sourceUrl = getVeociUrl(edge.from);
+                        const sourceLink = sourceUrl ? `<a href="${{sourceUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         const li = document.createElement('li');
                         li.className = 'ref-item';
 
@@ -1457,6 +1612,7 @@ def generate_dashboard_html(
                                 <div><strong>Trigger:</strong> ${{formatTriggerType(edge.trigger_type)}}</div>
                                 <div><strong>Automatic:</strong> ${{edge.automatic ? 'Yes' : 'No'}}</div>
                             </div>
+                            ${{sourceLink}}
                         `;
                         wrapper.appendChild(li);
                     }});
@@ -1482,6 +1638,8 @@ def generate_dashboard_html(
 
                     fields.forEach(edge => {{
                         const sourceNode = nodesData.find(n => n.id === edge.from);
+                        const sourceUrl = getVeociUrl(edge.from);
+                        const sourceLink = sourceUrl ? `<a href="${{sourceUrl}}" target="_blank" class="ref-item-veoci-link" onclick="event.stopPropagation()">Open in Veoci ↗</a>` : '';
                         const li = document.createElement('li');
                         li.className = 'ref-item';
 
@@ -1491,6 +1649,7 @@ def generate_dashboard_html(
                                 <div><strong>Type:</strong> ${{getReadableType(edge)}}</div>
                                 <div><strong>Field:</strong> ${{edge.field_name || 'N/A'}}</div>
                             </div>
+                            ${{sourceLink}}
                         `;
                         fieldWrapper.appendChild(li);
                     }});
@@ -1561,6 +1720,7 @@ def export_dashboard(
     graph: nx.DiGraph,
     markdown_summary: str,
     output_path: Path,
+    base_url: str,
 ) -> Path:
     """Export unified dashboard HTML."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1573,6 +1733,7 @@ def export_dashboard(
         stats=stats,
         graph=graph,
         markdown_summary=markdown_summary,
+        base_url=base_url,
     )
 
     with open(output_path, "w", encoding="utf-8") as f:

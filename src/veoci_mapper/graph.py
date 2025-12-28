@@ -12,6 +12,7 @@ def build_graph(
     workflows: list[dict[str, Any]],
     relationships: list[Relationship],
     task_types: list[dict[str, Any]] | None = None,
+    solution_container_id: str | None = None,
 ) -> nx.DiGraph:
     """
     Build a directed graph from forms, workflows, task types, and their relationships.
@@ -26,20 +27,26 @@ def build_graph(
     for form in forms:
         form_id = str(form.get("id") or form.get("formId"))
         is_external = form.get("external", False)
+        # External forms may have their own containerId, otherwise use solution container
+        container_id = form.get("containerId") or solution_container_id
         graph.add_node(
             form_id,
             name=form.get("name", "Unknown"),
             node_type="form",
             external=is_external,
+            container_id=str(container_id) if container_id else None,
         )
 
     # Add workflow nodes
     for workflow in workflows:
         workflow_id = str(workflow.get("id") or workflow.get("processId"))
+        # External workflows may have their own containerId, otherwise use solution container
+        container_id = workflow.get("containerId") or solution_container_id
         graph.add_node(
             workflow_id,
             name=workflow.get("name", "Unknown"),
             node_type="workflow",
+            container_id=str(container_id) if container_id else None,
         )
 
     # Add task type nodes
