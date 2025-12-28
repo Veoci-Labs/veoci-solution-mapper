@@ -79,22 +79,22 @@ def generate_dashboard_html(
             color = "#ff9800" if is_external else "#4fc3f7"
             shape = "dot"
             size = 30
-            font_config = {"vadjust": 20}
+            font_config = {"size": 11, "multi": True, "vadjust": 5}
         elif node_type == "workflow":
             color = "#ba68c8"
             shape = "square"
             size = 25
-            font_config = {"vadjust": 20}
+            font_config = {"size": 11, "multi": True, "vadjust": 5}
         elif node_type == "task_type":
             color = "#80cbc4" if is_external else "#26a69a"
             shape = "diamond"
             size = 30
-            font_config = {"vadjust": 25}
+            font_config = {"size": 11, "multi": True, "vadjust": 8}
         else:
             color = "#ba68c8"
             shape = "dot"
             size = 30
-            font_config = {"vadjust": 50}
+            font_config = {"size": 11, "multi": True, "vadjust": 5}
 
         node_def = {
             "id": node_id,
