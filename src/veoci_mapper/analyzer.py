@@ -20,6 +20,10 @@ class Relationship(BaseModel):
     action_name: str | None = None
     trigger_type: str | None = None
     automatic: bool | None = None
+    # Task type metadata (only populated for task_type relationships)
+    target_container_id: str | None = None
+    # Reference type metadata (only populated for REFERENCE relationships)
+    is_subform: bool | None = None
 
 
 # Relationship types
@@ -27,6 +31,7 @@ REFERENCE = "REFERENCE"
 FORM_ENTRY = "FORM_ENTRY"
 LOOKUP = "LOOKUP"
 WORKFLOW = "WORKFLOW"
+TASK = "TASK"
 
 # Action-based relationship types
 ACTION_CREATES_ENTRY = "ACTION_CREATES_ENTRY"
@@ -36,11 +41,14 @@ ACTION_LAUNCHES_TEMPLATE = "ACTION_LAUNCHES_TEMPLATE"
 ACTION_LAUNCHES_PLAN = "ACTION_LAUNCHES_PLAN"
 
 
-def extract_relationships(form_definition: dict[str, Any]) -> list[Relationship]:
+def extract_relationships(
+    form_definition: dict[str, Any], container_id: str | None = None
+) -> list[Relationship]:
     """Extract all relationships from a single form definition.
 
     Args:
         form_definition: A form definition dict from the Veoci API
+        container_id: Optional container ID to detect external relationships
 
     Returns:
         List of Relationship objects found in this form
@@ -64,6 +72,14 @@ def extract_relationships(form_definition: dict[str, Any]) -> list[Relationship]
                 source_form = field.get("sourceForm", {})
                 target_name = source_form.get("name") if source_form else None
 
+                # Extract is_subform for REFERENCE fields
+                is_subform = None
+                if field_type == REFERENCE:
+                    reference_new_entry = field.get("properties", {}).get("referenceNewEntry")
+                    is_subform = (
+                        bool(reference_new_entry) if reference_new_entry is not None else None
+                    )
+
                 relationships.append(
                     Relationship(
                         source_id=form_id,
@@ -73,6 +89,7 @@ def extract_relationships(form_definition: dict[str, Any]) -> list[Relationship]
                         target_type="form",
                         relationship_type=field_type,
                         field_name=field_name,
+                        is_subform=is_subform,
                     )
                 )
 
@@ -92,6 +109,31 @@ def extract_relationships(form_definition: dict[str, Any]) -> list[Relationship]
                         target_type="workflow",
                         relationship_type=WORKFLOW,
                         field_name=field_name,
+                    )
+                )
+
+        # TASK - uses properties.taskTypeFilter and taskTypeContainer
+        elif field_type == TASK:
+            properties = field.get("properties", {})
+            task_type_id = properties.get("taskTypeFilter")
+            task_type_container = properties.get("taskTypeContainer")
+
+            if task_type_id:
+                # Use taskTypeContainer - this is where the task type is defined
+                # Task types can be defined at group level, not the room/solution level
+                container_id_str = (
+                    str(task_type_container) if task_type_container else None
+                )
+                relationships.append(
+                    Relationship(
+                        source_id=form_id,
+                        source_name=form_name,
+                        target_id=str(task_type_id),
+                        target_name=None,  # Will be resolved during analysis
+                        target_type="task_type",
+                        relationship_type=TASK,
+                        field_name=field_name,
+                        target_container_id=container_id_str,
                     )
                 )
 
@@ -156,11 +198,21 @@ def extract_action_relationships(
 
         elif target_object_type == 3:  # Task
             relationship_type = ACTION_CREATES_TASK
-            target_type = "form"  # Tasks are form-like entities
+            target_type = "task_type"  # Task types, not task instances
             target_id = params.get("targetTaskType")
 
         # Add relationship if we found a valid target
         if relationship_type and target_id:
+            # For task types, extract container ID from action params
+            target_container_id = None
+            if target_type == "task_type":
+                # Check for container in action params (field name may vary)
+                target_container_id = (
+                    params.get("targetTaskTypeContainer")
+                    or params.get("taskTypeContainer")
+                    or params.get("targetContainer")
+                )
+
             relationships.append(
                 Relationship(
                     source_id=source_id,
@@ -174,6 +226,7 @@ def extract_action_relationships(
                     action_name=action_name,
                     trigger_type=trigger_type,
                     automatic=automatic,
+                    target_container_id=str(target_container_id) if target_container_id else None,
                 )
             )
 
@@ -229,22 +282,28 @@ def get_referenced_ids(relationships: list[Relationship]) -> set[str]:
 def analyze_solution(
     form_definitions: list[dict[str, Any]],
     actions: dict[str, list[dict[str, Any]]] | None = None,
+    container_id: str | None = None,
+    task_types: dict[str, dict[str, Any]] | None = None,
 ) -> list[Relationship]:
-    """Analyze all forms in a solution and extract relationships.
+    """Analyze all forms and task types in a solution and extract relationships.
 
     Args:
         form_definitions: List of form definition dicts
         actions: Optional dict mapping object IDs to their action lists
                  Format: {object_id: [action1, action2, ...]}
+        container_id: Optional container ID for external relationship detection
+        task_types: Optional dict mapping task_type_id -> task type definition
+                    Format: {task_type_id: {"id": ..., "name": ..., "fields": {...}}}
 
     Returns:
         Combined list of all relationships, deduplicated
     """
     all_relationships: list[Relationship] = []
 
+    # Process forms
     for form in form_definitions:
         # Extract field-based relationships
-        relationships = extract_relationships(form)
+        relationships = extract_relationships(form, container_id=container_id)
         all_relationships.extend(relationships)
 
         # Extract action-based relationships if actions provided
@@ -261,6 +320,30 @@ def analyze_solution(
                     actions=form_actions,
                 )
                 all_relationships.extend(action_relationships)
+
+    # Process task types (same pattern as forms)
+    if task_types:
+        for task_type_id, task_type in task_types.items():
+            # Extract field-based relationships from task type
+            # Task type structure: {"id": ..., "name": ..., "fields": {...}, "container": {...}}
+            relationships = extract_relationships(
+                task_type, container_id=container_id
+            )
+            all_relationships.extend(relationships)
+
+            # Extract action-based relationships if actions provided
+            if actions:
+                task_type_name = task_type.get("name", "Unknown Task Type")
+                task_type_actions = actions.get(task_type_id, [])
+
+                if task_type_actions:
+                    action_relationships = extract_action_relationships(
+                        source_id=task_type_id,
+                        source_name=task_type_name,
+                        source_type="task_type",
+                        actions=task_type_actions,
+                    )
+                    all_relationships.extend(action_relationships)
 
     # Deduplicate based on all fields
     seen = set()

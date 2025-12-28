@@ -11,14 +11,16 @@ def build_graph(
     forms: list[dict[str, Any]],
     workflows: list[dict[str, Any]],
     relationships: list[Relationship],
+    task_types: list[dict[str, Any]] | None = None,
 ) -> nx.DiGraph:
     """
-    Build a directed graph from forms, workflows, and their relationships.
+    Build a directed graph from forms, workflows, task types, and their relationships.
 
-    Nodes represent forms and workflows.
+    Nodes represent forms, workflows, and task types.
     Edges represent relationships between them.
     """
     graph = nx.DiGraph()
+    task_types = task_types or []
 
     # Add form nodes
     for form in forms:
@@ -40,6 +42,20 @@ def build_graph(
             node_type="workflow",
         )
 
+    # Add task type nodes
+    for task_type in task_types:
+        # Use categoryId as the canonical identifier (referenced by TASK fields)
+        task_type_id = str(task_type.get("categoryId"))
+        is_external = task_type.get("external", False)
+        container_id = task_type.get("container", {}).get("id")
+        graph.add_node(
+            task_type_id,
+            name=task_type.get("name", "Unknown"),
+            node_type="task_type",
+            external=is_external,
+            container_id=str(container_id) if container_id else None,
+        )
+
     # Add relationship edges
     for rel in relationships:
         edge_data = {
@@ -58,6 +74,10 @@ def build_graph(
         else:
             edge_data["edge_category"] = "field"
 
+        # Add is_subform if present (for REFERENCE relationships)
+        if rel.is_subform is not None:
+            edge_data["is_subform"] = rel.is_subform
+
         graph.add_edge(rel.source_id, rel.target_id, **edge_data)
 
     return graph
@@ -67,6 +87,7 @@ def get_graph_stats(graph: nx.DiGraph) -> dict[str, Any]:
     """Get statistics about the solution graph."""
     form_nodes = [n for n, d in graph.nodes(data=True) if d.get("node_type") == "form"]
     workflow_nodes = [n for n, d in graph.nodes(data=True) if d.get("node_type") == "workflow"]
+    task_type_nodes = [n for n, d in graph.nodes(data=True) if d.get("node_type") == "task_type"]
 
     # Count edges by relationship type and category
     edge_types: dict[str, int] = {}
@@ -93,6 +114,7 @@ def get_graph_stats(graph: nx.DiGraph) -> dict[str, Any]:
         "total_nodes": graph.number_of_nodes(),
         "form_count": len(form_nodes),
         "workflow_count": len(workflow_nodes),
+        "task_type_count": len(task_type_nodes),
         "total_edges": graph.number_of_edges(),
         "action_edges": action_edges,
         "field_edges": field_edges,

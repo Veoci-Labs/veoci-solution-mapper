@@ -14,7 +14,12 @@ from rich.panel import Panel
 
 from veoci_mapper.analyzer import analyze_solution, get_referenced_ids
 from veoci_mapper.client import AuthenticationError, VeociClient
-from veoci_mapper.fetcher import fetch_external_forms, fetch_solution
+from veoci_mapper.fetcher import (
+    fetch_all_task_type_definitions,
+    fetch_external_forms,
+    fetch_external_task_types,
+    fetch_solution,
+)
 from veoci_mapper.graph import build_graph, get_graph_stats
 from veoci_mapper.output import (
     export_dashboard,
@@ -65,10 +70,116 @@ async def run_map(
             # Extract actions from solution
             actions = solution.get("actions", {})
 
+            # Fetch full definitions for solution task types
+            task_types_list = solution.get("task_types", [])
+            if task_types_list:
+                console.print(
+                    f"[dim]Fetching {len(task_types_list)} task type definitions...[/dim]"
+                )
+                # Extract container ID from each task type, or fall back to room_id
+                task_type_refs = [
+                    (
+                        str(tt.get("categoryId")),
+                        str(tt.get("container", {}).get("id", room_id))
+                    )
+                    for tt in task_types_list
+                ]
+                solution_task_types_dict = await fetch_all_task_type_definitions(
+                    client,
+                    task_type_refs,
+                )
+                solution_task_types = list(solution_task_types_dict.values())
+                console.print(
+                    f"[green]Fetched {len(solution_task_types)} "
+                    "task type definitions[/green]"
+                )
+            else:
+                solution_task_types = []
+
             # Analyze relationships (field + action)
             console.print("[dim]Analyzing relationships...[/dim]")
-            relationships = analyze_solution(solution["form_definitions"], actions=actions)
+            relationships = analyze_solution(
+                solution["form_definitions"],
+                actions=actions,
+                container_id=solution.get("container_id"),
+            )
             console.print(f"[green]Found {len(relationships)} relationships[/green]")
+
+            # Extract task type references from relationships
+            task_type_refs = {
+                (r.target_id, r.target_container_id)
+                for r in relationships
+                if r.target_type == "task_type" and r.target_container_id
+            }
+
+            # Fetch external task types (from other containers)
+            # Use categoryId as canonical identifier (referenced by TASK fields)
+            existing_task_type_ids = {str(tt.get("categoryId")) for tt in solution_task_types}
+            external_task_types = await fetch_external_task_types(
+                client,
+                task_type_refs,
+                existing_task_type_ids,
+                room_id,
+            )
+
+            # Merge task types
+            all_task_types = solution_task_types + external_task_types
+            task_types_by_id = {str(tt.get("categoryId")): tt for tt in all_task_types}
+
+            # Re-analyze with task types to extract relationships from task type fields
+            # This may reveal additional task type references (recursive)
+            if task_types_by_id:
+                console.print("[dim]Analyzing task type relationships...[/dim]")
+                task_type_relationships = analyze_solution(
+                    solution["form_definitions"],
+                    actions=actions,
+                    container_id=solution.get("container_id"),
+                    task_types=task_types_by_id,
+                )
+
+                # Extract any new task type references from task type fields
+                new_task_type_refs = {
+                    (r.target_id, r.target_container_id)
+                    for r in task_type_relationships
+                    if r.target_type == "task_type"
+                    and r.target_container_id
+                    and r.target_id not in task_types_by_id
+                }
+
+                # Fetch any newly discovered task types
+                if new_task_type_refs:
+                    console.print(
+                        f"[dim]Fetching {len(new_task_type_refs)} "
+                        "task types referenced by other task types...[/dim]"
+                    )
+                    more_task_types = await fetch_external_task_types(
+                        client,
+                        new_task_type_refs,
+                        set(task_types_by_id.keys()),
+                        room_id,
+                    )
+                    # Add to collections
+                    all_task_types.extend(more_task_types)
+                    for tt in more_task_types:
+                        task_types_by_id[str(tt.get("categoryId"))] = tt
+
+                # Merge unique relationships
+                existing_rel_keys = {
+                    (r.source_id, r.target_id, r.field_name, r.action_id)
+                    for r in relationships
+                }
+                added_count = 0
+                for rel in task_type_relationships:
+                    key = (rel.source_id, rel.target_id, rel.field_name, rel.action_id)
+                    if key not in existing_rel_keys:
+                        relationships.append(rel)
+                        existing_rel_keys.add(key)
+                        added_count += 1
+                if added_count > 0:
+                    console.print(
+                        f"[green]Found {added_count} additional relationships "
+                        "from task types[/green]"
+                    )
 
             # Fetch external forms
             existing_form_ids = {str(f.get("id") or f.get("formId")) for f in solution["forms"]}
@@ -84,15 +195,33 @@ async def run_map(
                 all_forms,
                 solution["workflows"],
                 relationships,
+                task_types=all_task_types,
             )
             stats = get_graph_stats(graph)
 
             # Print stats
             console.print("\n[bold]Graph Statistics:[/bold]")
+
+            # Build node type breakdown
+            node_types = [f"{stats['form_count']} forms", f"{stats['workflow_count']} workflows"]
+            if stats.get('task_type_count', 0) > 0:
+                node_types.append(f"{stats['task_type_count']} task types")
+
             console.print(
-                f"  Nodes: {stats['total_nodes']} "
-                f"({stats['form_count']} forms, {stats['workflow_count']} workflows)"
+                f"  Nodes: {stats['total_nodes']} ({', '.join(node_types)})"
             )
+
+            # Count external nodes
+            external_form_count = sum(1 for f in all_forms if f.get("external", False))
+            external_task_type_count = sum(1 for tt in all_task_types if tt.get("external", False))
+            if external_form_count > 0 or external_task_type_count > 0:
+                external_parts = []
+                if external_form_count > 0:
+                    external_parts.append(f"{external_form_count} forms")
+                if external_task_type_count > 0:
+                    external_parts.append(f"{external_task_type_count} task types")
+                console.print(f"  External: {', '.join(external_parts)}")
+
             console.print(f"  Edges: {stats['total_edges']}")
             console.print(f"  Isolated: {stats['isolated_nodes']}")
             console.print(f"  Components: {stats['connected_components']}")
@@ -135,6 +264,7 @@ async def run_map(
                 container_id=room_id,
                 forms=all_forms,
                 workflows=solution["workflows"],
+                task_types=all_task_types,
                 relationships=relationships,
                 stats=stats,
                 output_path=output_dir / "solution.json",

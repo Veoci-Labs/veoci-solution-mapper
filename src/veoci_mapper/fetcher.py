@@ -23,6 +23,51 @@ async def fetch_form_definition(client: VeociClient, form_id: str) -> dict[str, 
     return await client.get(f"/forms/{form_id}")
 
 
+async def fetch_task_type_definition(
+    client: VeociClient,
+    task_type_id: str,
+    container_id: str,
+) -> dict[str, Any] | None:
+    """
+    Fetch task type definition from the task creation endpoint.
+
+    The task type is nested at response["values"]["0"]["data"]["value"]["category"].
+    Returns the category object containing id, name, container, fields, etc.
+    Returns None if the task type is inaccessible or doesn't exist.
+    """
+    try:
+        response = await client.get(
+            "/tasks/create",
+            params={"type": task_type_id, "c": container_id}
+        )
+        # Navigate nested structure to extract category
+        category = (
+            response
+            .get("values", {})
+            .get("0", {})
+            .get("data", {})
+            .get("value", {})
+            .get("category")
+        )
+
+        if not category:
+            logger.warning(
+                f"Task type {task_type_id} exists but has no category definition"
+            )
+            return None
+
+        return category
+
+    except Exception as e:
+        logger.warning(f"Failed to fetch task type {task_type_id}: {e}")
+        return None
+
+
+async def fetch_task_types_list(client: VeociClient, container_id: str) -> list[dict[str, Any]]:
+    """Fetch list of all task types in a container."""
+    return await client.get("/tasks/types", params={"c": container_id})
+
+
 async def fetch_workflows_list(client: VeociClient, container_id: str) -> list[dict[str, Any]]:
     """Fetch list of all workflows in a container."""
     return await client.get("/workflows", params={"c": container_id})
@@ -52,6 +97,49 @@ async def fetch_all_form_definitions(
 
     tasks = [fetch_with_semaphore(form) for form in forms]
     return await asyncio.gather(*tasks)
+
+
+async def fetch_all_task_type_definitions(
+    client: VeociClient,
+    task_type_refs: list[tuple[str, str]],
+    max_concurrent: int = 5,
+) -> dict[str, dict[str, Any]]:
+    """
+    Fetch task type definitions in parallel.
+
+    Args:
+        task_type_refs: List of (task_type_id, container_id) tuples
+        max_concurrent: Max parallel requests
+
+    Returns:
+        Dict mapping task_type_id -> task type definition (category object)
+    """
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def fetch_with_semaphore(
+        task_type_id: str,
+        container_id: str,
+    ) -> tuple[str, dict[str, Any] | None]:
+        async with semaphore:
+            definition = await fetch_task_type_definition(
+                client,
+                task_type_id,
+                container_id
+            )
+            return (task_type_id, definition)
+
+    tasks = [
+        fetch_with_semaphore(tt_id, c_id)
+        for tt_id, c_id in task_type_refs
+    ]
+    results = await asyncio.gather(*tasks)
+
+    # Filter out None results and return as dict
+    return {
+        tt_id: definition
+        for tt_id, definition in results
+        if definition is not None
+    }
 
 
 async def fetch_external_forms(
@@ -91,6 +179,75 @@ async def fetch_external_forms(
     console.print(f"[green]Fetched {len(external_forms)} external forms[/green]")
 
     return external_forms
+
+
+async def fetch_external_task_types(
+    client: VeociClient,
+    task_type_refs: set[tuple[str, str]],
+    existing_task_type_ids: set[str],
+    solution_container_id: str,
+    max_concurrent: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Fetch task types that are referenced but not in the main container.
+
+    Args:
+        task_type_refs: Set of (task_type_id, container_id) tuples from references
+        existing_task_type_ids: IDs of task types already fetched from main container
+        solution_container_id: The main solution container ID
+
+    Returns task types with 'external' flag set to True for those from other containers.
+    """
+    # Filter to only task types we don't already have
+    missing_refs = [
+        (tt_id, c_id)
+        for tt_id, c_id in task_type_refs
+        if tt_id not in existing_task_type_ids
+    ]
+
+    if not missing_refs:
+        return []
+
+    console.print(f"[dim]Fetching {len(missing_refs)} external task types...[/dim]")
+
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def fetch_one(
+        task_type_id: str,
+        container_id: str,
+    ) -> dict[str, Any] | None:
+        async with semaphore:
+            task_type = await fetch_task_type_definition(
+                client,
+                task_type_id,
+                container_id
+            )
+
+            if task_type is None:
+                return None
+
+            # Mark as external if from different container
+            task_type_container = task_type.get("container", {}).get("id")
+            if task_type_container and str(task_type_container) != str(solution_container_id):
+                task_type["external"] = True
+
+            # Ensure formType is set
+            if "formType" not in task_type:
+                task_type["formType"] = "TASK"
+
+            return task_type
+
+    tasks = [fetch_one(tt_id, c_id) for tt_id, c_id in missing_refs]
+    results = await asyncio.gather(*tasks)
+
+    external_task_types = [tt for tt in results if tt is not None]
+    external_count = sum(1 for tt in external_task_types if tt.get("external"))
+    console.print(
+        f"[green]Fetched {len(external_task_types)} task types "
+        f"({external_count} external)[/green]"
+    )
+
+    return external_task_types
 
 
 async def fetch_object_actions(
@@ -224,12 +381,12 @@ async def fetch_solution(
     Fetch complete solution data from a container.
 
     Returns:
-        dict with keys: forms, form_definitions, workflows, actions, container_id
+        dict with keys: forms, form_definitions, workflows, task_types, actions, container_id
     """
     # Track progress if provided
     task_id: TaskID | None = None
     if progress:
-        task_id = progress.add_task("Fetching solution...", total=4)
+        task_id = progress.add_task("Fetching solution...", total=5)
 
     def advance() -> None:
         if progress and task_id is not None:
@@ -247,13 +404,19 @@ async def fetch_solution(
     console.print(f"[green]Found {len(workflows)} workflows[/green]")
     advance()
 
-    # 3. Fetch all form definitions in parallel
+    # 3. Fetch task types list
+    console.print("[dim]Fetching task types list...[/dim]")
+    task_types_list = await fetch_task_types_list(client, container_id)
+    console.print(f"[green]Found {len(task_types_list)} task types[/green]")
+    advance()
+
+    # 4. Fetch all form definitions in parallel
     console.print(f"[dim]Fetching {len(forms)} form definitions...[/dim]")
     form_definitions = await fetch_all_form_definitions(client, forms)
     console.print(f"[green]Fetched {len(form_definitions)} form definitions[/green]")
     advance()
 
-    # 4. Fetch custom actions for all forms and workflows
+    # 5. Fetch custom actions for all forms and workflows
     form_ids = [str(f.get("id") or f.get("formId")) for f in forms]
     workflow_ids = [str(w.get("id")) for w in workflows if w.get("id")]
     all_object_ids = form_ids + workflow_ids
@@ -290,5 +453,6 @@ async def fetch_solution(
         "forms": forms,
         "form_definitions": form_definitions,
         "workflows": workflows,
+        "task_types": task_types_list,
         "actions": actions,
     }

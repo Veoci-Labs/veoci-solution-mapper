@@ -3,8 +3,8 @@
 import json
 from pathlib import Path
 from typing import Any
+
 from pydantic import BaseModel
-import networkx as nx
 
 from veoci_mapper.analyzer import Relationship
 
@@ -14,6 +14,7 @@ class SolutionExport(BaseModel):
     container_id: str
     forms: list[dict[str, Any]]
     workflows: list[dict[str, Any]]
+    task_types: list[dict[str, Any]]
     relationships: list[dict[str, Any]]
     statistics: dict[str, Any]
 
@@ -22,6 +23,7 @@ def export_json(
     container_id: str,
     forms: list[dict[str, Any]],
     workflows: list[dict[str, Any]],
+    task_types: list[dict[str, Any]],
     relationships: list[Relationship],
     stats: dict[str, Any],
     output_path: Path,
@@ -46,6 +48,11 @@ def export_json(
             "id": str(w.get("id") or w.get("processId")),
             "name": w.get("name", "Unknown"),
         } for w in workflows],
+        task_types=[{
+            "id": str(tt.get("categoryId")),
+            "name": tt.get("name", "Unknown"),
+            "external": tt.get("external", False),
+        } for tt in task_types],
         relationships=[r.model_dump() for r in relationships],
         statistics=stats,
     )
