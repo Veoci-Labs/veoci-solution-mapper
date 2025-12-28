@@ -12,7 +12,8 @@ env/
 
 # Distribution / packaging
 dist/
-build/
+build/veoci-map/
+build/*.pkg
 *.egg-info/
 .eggs/
 

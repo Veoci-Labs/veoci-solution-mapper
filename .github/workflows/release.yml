@@ -12,14 +12,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-14
-            platform: macos-arm64
+          - os: macos-latest
+            platform: macos
             binary: veoci-map
-            archive: veoci-map-macos-arm64.tar.gz
-          - os: macos-13-large
-            platform: macos-x64
-            binary: veoci-map
-            archive: veoci-map-macos-x64.tar.gz
+            archive: veoci-map-macos.tar.gz
           - os: ubuntu-latest
             platform: linux-x64
             binary: veoci-map
@@ -78,8 +74,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/macos-arm64/veoci-map-macos-arm64.tar.gz
-            artifacts/macos-x64/veoci-map-macos-x64.tar.gz
+            artifacts/macos/veoci-map-macos.tar.gz
             artifacts/linux-x64/veoci-map-linux-x64.tar.gz
             artifacts/windows-x64/veoci-map-windows-x64.zip
           generate_release_notes: true

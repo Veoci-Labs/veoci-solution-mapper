@@ -12,8 +12,7 @@ Download the latest release for your platform:
 
 | Platform | File |
 |----------|------|
-| Mac (Apple Silicon) | `veoci-map-macos-arm64.tar.gz` |
-| Mac (Intel) | `veoci-map-macos-x64.tar.gz` |
+| Mac | `veoci-map-macos.tar.gz` |
 | Windows | `veoci-map-windows-x64.zip` |
 | Linux | `veoci-map-linux-x64.tar.gz` |
 
@@ -21,7 +20,7 @@ Download the latest release for your platform:
 
 **Mac/Linux:**
 ```bash
-tar -xzf veoci-map-macos-arm64.tar.gz
+tar -xzf veoci-map-macos.tar.gz
 chmod +x veoci-map
 ```
 
