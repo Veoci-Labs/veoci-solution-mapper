@@ -31,6 +31,7 @@ REFERENCE = "REFERENCE"
 FORM_ENTRY = "FORM_ENTRY"
 LOOKUP = "LOOKUP"
 WORKFLOW = "WORKFLOW"
+WORKFLOW_LOOKUP = "WORKFLOW_LOOKUP"
 TASK = "TASK"
 
 # Action-based relationship types
@@ -93,8 +94,8 @@ def extract_relationships(
                     )
                 )
 
-        # WORKFLOW - uses properties.processId
-        elif field_type == WORKFLOW:
+        # WORKFLOW and WORKFLOW_LOOKUP - both use properties.processId
+        elif field_type in {WORKFLOW, WORKFLOW_LOOKUP}:
             properties = field.get("properties", {})
             process_id = properties.get("processId")
             process_name = properties.get("processName")
@@ -107,7 +108,7 @@ def extract_relationships(
                         target_id=str(process_id),
                         target_name=process_name,
                         target_type="workflow",
-                        relationship_type=WORKFLOW,
+                        relationship_type=field_type,  # Preserve actual field type
                         field_name=field_name,
                     )
                 )
@@ -277,6 +278,11 @@ def extract_action_relationships(
 def get_referenced_ids(relationships: list[Relationship]) -> set[str]:
     """Get all target IDs from relationships."""
     return {r.target_id for r in relationships if r.target_type == "form"}
+
+
+def get_referenced_workflow_ids(relationships: list[Relationship]) -> set[str]:
+    """Get all workflow IDs from relationships."""
+    return {r.target_id for r in relationships if r.target_type == "workflow"}
 
 
 def analyze_solution(

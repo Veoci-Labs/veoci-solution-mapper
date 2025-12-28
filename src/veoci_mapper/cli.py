@@ -12,12 +12,13 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
 
-from veoci_mapper.analyzer import analyze_solution, get_referenced_ids
+from veoci_mapper.analyzer import analyze_solution, get_referenced_ids, get_referenced_workflow_ids
 from veoci_mapper.client import AuthenticationError, VeociClient
 from veoci_mapper.fetcher import (
     fetch_all_task_type_definitions,
     fetch_external_forms,
     fetch_external_task_types,
+    fetch_external_workflows,
     fetch_solution,
 )
 from veoci_mapper.graph import build_graph, get_graph_stats
@@ -186,14 +187,22 @@ async def run_map(
             referenced_ids = get_referenced_ids(relationships)
             external_forms = await fetch_external_forms(client, referenced_ids, existing_form_ids)
 
-            # Merge external forms
+            # Fetch external workflows
+            existing_workflow_ids = {str(w.get("id")) for w in solution["workflows"]}
+            referenced_workflow_ids = get_referenced_workflow_ids(relationships)
+            external_workflows = await fetch_external_workflows(
+                client, referenced_workflow_ids, existing_workflow_ids, room_id
+            )
+
+            # Merge external forms and workflows
             all_forms = solution["forms"] + external_forms
+            all_workflows = solution["workflows"] + external_workflows
 
             # Build graph
             console.print("[dim]Building graph...[/dim]")
             graph = build_graph(
                 all_forms,
-                solution["workflows"],
+                all_workflows,
                 relationships,
                 task_types=all_task_types,
             )
@@ -234,7 +243,7 @@ async def run_map(
             summary = await generate_markdown_summary(
                 container_id=room_id,
                 forms=all_forms,
-                workflows=solution["workflows"],
+                workflows=all_workflows,
                 stats=stats,
                 graph=graph,
             )
@@ -242,7 +251,7 @@ async def run_map(
                 summary = generate_basic_markdown(
                     container_id=room_id,
                     forms=all_forms,
-                    workflows=solution["workflows"],
+                    workflows=all_workflows,
                     stats=stats,
                 )
 
@@ -250,7 +259,7 @@ async def run_map(
             dashboard_path = export_dashboard(
                 container_id=room_id,
                 forms=all_forms,
-                workflows=solution["workflows"],
+                workflows=all_workflows,
                 relationships=relationships,
                 stats=stats,
                 graph=graph,
@@ -263,7 +272,7 @@ async def run_map(
             json_path = export_json(
                 container_id=room_id,
                 forms=all_forms,
-                workflows=solution["workflows"],
+                workflows=all_workflows,
                 task_types=all_task_types,
                 relationships=relationships,
                 stats=stats,

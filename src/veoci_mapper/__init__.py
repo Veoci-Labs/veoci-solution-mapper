@@ -6,9 +6,11 @@ from veoci_mapper.analyzer import (
     REFERENCE,
     TASK,
     WORKFLOW,
+    WORKFLOW_LOOKUP,
     Relationship,
     analyze_solution,
     extract_relationships,
+    get_referenced_workflow_ids,
 )
 from veoci_mapper.client import (
     AuthenticationError,
@@ -45,6 +47,8 @@ __all__ = [
     "LOOKUP",
     "TASK",
     "WORKFLOW",
+    "WORKFLOW_LOOKUP",
+    "get_referenced_workflow_ids",
     "build_graph",
     "get_graph_stats",
     "get_node_neighbors",
