@@ -60,6 +60,22 @@ def configure_logging(debug: bool = False) -> None:
     )
 
 
+def validate_output_path(output_dir: Path, console: Console) -> None:
+    """Create output directory if needed. Shows error if user-specified path fails."""
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        console.print(
+            f"[bold red]Permission denied:[/bold red] Cannot write to {output_dir.absolute()}"
+        )
+        console.print("\n[yellow]Try specifying a different location:[/yellow]")
+        console.print(
+            "  [bold]--output[/bold] flag: "
+            "[dim]veoci-mapper --output C:\\Users\\You\\Desktop\\output[/dim]"
+        )
+        raise typer.Exit(1)
+
+
 async def run_map(
     room_id: str,
     token: str,
@@ -70,6 +86,10 @@ async def run_map(
     """Main mapping logic."""
 
     console.print(Panel(f"Mapping solution in room [bold]{room_id}[/bold]"))
+    console.print(f"[dim]Output directory:[/dim] {output_dir.absolute()}\n")
+
+    # Validate output path early, before API work
+    validate_output_path(output_dir, console)
 
     try:
         async with VeociClient(token=token, base_url=base_url) as client:
@@ -415,10 +435,10 @@ def map(
         help="Veoci API base URL",
     ),
     output: Path = typer.Option(
-        Path("./output"),
+        Path.home() / "veoci-mapper-output",
         "--output",
         "-o",
-        help="Output directory for generated files (default: ./output)",
+        help="Output directory for generated files",
     ),
     no_open: bool = typer.Option(
         False,

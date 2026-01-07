@@ -1,6 +1,6 @@
 [project]
 name = "veoci-solution-mapper"
-version = "0.1.0"
+version = "0.2.0"
 description = "CLI tool to map Veoci solution structure and dependencies"
 readme = "README.md"
 requires-python = ">=3.11"
